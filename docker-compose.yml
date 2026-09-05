@@ -1,0 +1,56 @@
+version: '3.9'
+
+services:
+  # ─── Frontend ────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_URL=http://backend:8000
+
+  # ─── Backend ─────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app
+      - ./data:/app/data
+      - ./ml/artifacts:/app/ml/artifacts
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://sentinelai:sentinelai@db:5432/sentinelai
+      - CORS_ORIGINS=["http://localhost:5173"]
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - LOG_LEVEL=INFO
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ─── Database ────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: sentinelai
+      POSTGRES_PASSWORD: sentinelai
+      POSTGRES_DB: sentinelai
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinelai"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
