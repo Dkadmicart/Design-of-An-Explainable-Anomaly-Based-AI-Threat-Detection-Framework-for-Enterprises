@@ -89,8 +89,8 @@ export default function Sidebar({
         className={clsx(
           'bg-white select-none flex flex-col justify-between transition-all duration-200 ease-in-out',
           // Desktop: flex-shrink-0 flex item so collapsing/expanding dynamically repositions MainArea
-          'hidden lg:flex relative flex-shrink-0 h-full z-30',
-          collapsed ? 'w-[70px]' : 'w-[248px]',
+          'hidden lg:flex relative flex-shrink-0 h-full z-30 border-r border-slate-200/80',
+          collapsed ? 'w-[72px]' : 'w-[248px]',
           // Mobile drawer: fixed overlay drawer
           mobileOpen && '!flex fixed inset-y-0 left-0 z-50 w-[260px] shadow-2xl animate-fade-in'
         )}
@@ -148,7 +148,7 @@ export default function Sidebar({
                       onClick={onMobileClose}
                       className={({ isActive }) =>
                         clsx(
-                          'flex items-center gap-3 px-3 rounded-xl text-sm font-semibold h-[40px]',
+                          'flex items-center gap-3 px-3 rounded-xl text-sm font-semibold h-[44px] min-w-0',
                           'transition-all duration-150 group w-full relative',
                           collapsed && !mobileOpen ? 'justify-center px-0' : '',
                           isActive

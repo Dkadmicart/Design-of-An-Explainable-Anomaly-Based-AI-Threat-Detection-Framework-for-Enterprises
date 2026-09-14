@@ -2,24 +2,147 @@ import type {
   DashboardSummary, NetworkEvent, Alert, MLModel, MitreTechnique,
   Dataset, AppSettings, AttackDistribution, InvestigationResult
 } from '../types';
+import type { User, AuthResponse, AuditLogEntry, InviteUserPayload, UserRole } from '../types/auth';
 
 const API_BASE = '/api';
+const TOKEN_KEY = 'sentinelai_access_token';
+
+export function getStoredToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredToken(token: string | null): void {
+  try {
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options?.headers as Record<string, string>),
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_BASE}${url}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
     ...options,
+    headers,
   });
+
   if (!response.ok) {
-    throw new Error(`API error ${response.status}: ${response.statusText}`);
+    let errorDetail = response.statusText;
+    try {
+      const errData = await response.json();
+      if (errData?.detail) {
+        errorDetail = errData.detail;
+      }
+    } catch {
+      // Use statusText if body not JSON
+    }
+    const error = new Error(errorDetail) as Error & { status: number };
+    error.status = response.status;
+    throw error;
   }
   return response.json();
 }
 
 export const api = {
+  // Authentication
+  auth: {
+    login: async (email: string, password: string): Promise<AuthResponse> => {
+      const data = await fetchJson<AuthResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+      setStoredToken(data.access_token);
+      return data;
+    },
+
+    googleLogin: async (credential: string): Promise<AuthResponse> => {
+      const data = await fetchJson<AuthResponse>('/auth/google', {
+        method: 'POST',
+        body: JSON.stringify({ credential }),
+      });
+      setStoredToken(data.access_token);
+      return data;
+    },
+
+    me: async (): Promise<User> => {
+      return fetchJson<User>('/auth/me');
+    },
+
+    logout: async (): Promise<void> => {
+      try {
+        await fetchJson('/auth/logout', { method: 'POST' });
+      } finally {
+        setStoredToken(null);
+      }
+    },
+
+    forgotPassword: async (email: string): Promise<{ status: string; message: string; dev_reset_token?: string | null }> => {
+      return fetchJson('/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      });
+    },
+
+    resetPassword: async (token: string, new_password: string): Promise<{ status: string; message: string }> => {
+      return fetchJson('/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ token, new_password }),
+      });
+    },
+
+    getUsers: async (): Promise<User[]> => {
+      return fetchJson<User[]>('/auth/users');
+    },
+
+    inviteUser: async (payload: InviteUserPayload): Promise<User> => {
+      return fetchJson<User>('/auth/users/invite', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+    updateUserStatus: async (userId: string, isActive: boolean): Promise<User> => {
+      return fetchJson<User>(`/auth/users/${userId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_active: isActive }),
+      });
+    },
+
+    updateUserRole: async (userId: string, role: UserRole): Promise<User> => {
+      return fetchJson<User>(`/auth/users/${userId}/role`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role }),
+      });
+    },
+
+    revokeUserSessions: async (userId: string): Promise<{ status: string; message: string }> => {
+      return fetchJson<{ status: string; message: string }>(`/auth/users/${userId}/revoke-sessions`, {
+        method: 'POST',
+      });
+    },
+
+    getAuditLogs: async (limit: number = 30): Promise<AuditLogEntry[]> => {
+      return fetchJson<AuditLogEntry[]>(`/auth/audit-logs?limit=${limit}`);
+    },
+  },
+
   // Dashboard
   getDashboardSummary: async (): Promise<DashboardSummary> => {
     return fetchJson<DashboardSummary>('/dashboard/summary');

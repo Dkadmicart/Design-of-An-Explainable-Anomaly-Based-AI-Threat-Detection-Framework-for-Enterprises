@@ -62,6 +62,19 @@ class AttackType(str, enum.Enum):
     UNKNOWN = "UNKNOWN"
 
 
+class UserRole(str, enum.Enum):
+    ADMIN = "ADMIN"
+    SECURITY_ANALYST = "SECURITY_ANALYST"
+    VIEWER = "VIEWER"
+
+
+class AuthProviderType(str, enum.Enum):
+    PASSWORD = "PASSWORD"
+    GOOGLE = "GOOGLE"
+    OIDC = "OIDC"
+    SAML = "SAML"
+
+
 # ─── Models ──────────────────────────────────────────────────────────────────
 
 class Event(Base):
@@ -302,3 +315,105 @@ class DatasetRun(Base):
     processing_notes = Column(JSON, nullable=True)
     
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ─── Authentication & User Management Models ────────────────────────────────
+
+class User(Base):
+    """Enterprise SentinelAI User."""
+    __tablename__ = "users"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    display_name = Column(String(100), nullable=False)
+    role = Column(SAEnum(UserRole), default=UserRole.SECURITY_ANALYST, nullable=False, index=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    mfa_enabled = Column(Boolean, default=False, nullable=False)
+    organization_id = Column(String(36), nullable=True)  # Prepared for enterprise multi-tenancy
+    
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    last_login_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    auth_accounts = relationship("AuthenticationAccount", back_populates="user", cascade="all, delete-orphan")
+    sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
+    reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
+
+
+class AuthenticationAccount(Base):
+    """Linked authentication identity provider account (e.g. password, google, oidc, saml)."""
+    __tablename__ = "authentication_accounts"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    provider = Column(SAEnum(AuthProviderType), nullable=False, index=True)
+    provider_user_id = Column(String(255), nullable=False, index=True)  # e.g., email or oauth sub
+    password_hash = Column(String(255), nullable=True)  # Argon2id hash for password provider only
+    
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationship
+    user = relationship("User", back_populates="auth_accounts")
+
+    __table_args__ = (
+        Index("idx_auth_provider_uid", "provider", "provider_user_id", unique=True),
+    )
+
+
+class UserSession(Base):
+    """User session for refresh token validation and revocation."""
+    __tablename__ = "user_sessions"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    refresh_token_hash = Column(String(128), nullable=False, index=True)
+    user_agent = Column(String(255), nullable=True)
+    ip_address = Column(String(45), nullable=True)
+    is_revoked = Column(Boolean, default=False, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationship
+    user = relationship("User", back_populates="sessions")
+
+
+class PasswordResetToken(Base):
+    """Secure password reset token."""
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = Column(String(128), nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    is_used = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationship
+    user = relationship("User", back_populates="reset_tokens")
+
+
+class AuditLog(Base):
+    """Security audit log for enterprise actions."""
+    __tablename__ = "audit_logs"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    user_id = Column(String(36), nullable=True, index=True)
+    action = Column(String(100), nullable=False, index=True)  # LOGIN_SUCCESS, LOGIN_FAILED, LOGOUT, etc.
+    resource = Column(String(100), nullable=False)
+    status = Column(String(20), nullable=False)  # SUCCESS, FAILURE, REJECTED
+    ip_address = Column(String(45), nullable=True)
+    details = Column(JSON, nullable=True)
+
+
+class LoginAttempt(Base):
+    """Rate limiting and failed login tracking."""
+    __tablename__ = "login_attempts"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    identifier = Column(String(255), nullable=False, index=True)  # email or ip
+    attempt_time = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    successful = Column(Boolean, default=False, nullable=False)
+

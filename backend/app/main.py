@@ -9,7 +9,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
-from app.database.session import create_tables
+from app.database.session import create_tables, async_session
+from app.auth.service import seed_default_users
+from app.auth.routes import router as auth_router
 from app.api import (
     dashboard, events, alerts, models, mitre,
     datasets, replay, investigate, analytics, system, settings as settings_router
@@ -32,6 +34,9 @@ async def lifespan(app: FastAPI):
     logger.info("SentinelAI starting up...")
     await create_tables()
     logger.info("Database tables created/verified.")
+    async with async_session() as session:
+        await seed_default_users(session)
+    logger.info("Enterprise default users seeded/verified.")
     yield
     logger.info("SentinelAI shutting down...")
 
@@ -55,6 +60,7 @@ app.add_middleware(
 )
 
 # Register API routers
+app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(events.router, prefix="/api/events", tags=["Events"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
