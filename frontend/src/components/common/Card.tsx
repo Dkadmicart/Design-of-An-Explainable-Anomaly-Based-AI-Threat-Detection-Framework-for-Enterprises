@@ -6,9 +6,25 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   className?: string;
   hover?: boolean;
   padding?: 'none' | 'compact' | 'normal' | 'large';
+  'p-4'?: boolean;
+  'p-5'?: boolean;
+  'p-6'?: boolean;
+  'p-8'?: boolean;
+  'p-12'?: boolean;
 }
 
-export function Card({ children, className, hover = false, padding = 'normal', ...props }: CardProps) {
+export function Card({
+  children,
+  className,
+  hover = false,
+  padding = 'normal',
+  'p-4': p4,
+  'p-5': p5,
+  'p-6': p6,
+  'p-8': p8,
+  'p-12': p12,
+  ...props
+}: CardProps) {
   const paddingStyles = {
     none: 'p-0',
     compact: 'p-4 sm:p-5',
@@ -16,12 +32,19 @@ export function Card({ children, className, hover = false, padding = 'normal', .
     large: 'p-6 lg:p-8',
   };
 
+  let resolvedPadding = paddingStyles[padding];
+  if (p4) resolvedPadding = 'p-4';
+  if (p5) resolvedPadding = 'p-5';
+  if (p6) resolvedPadding = 'p-5 lg:p-6';
+  if (p8) resolvedPadding = 'p-8';
+  if (p12) resolvedPadding = 'p-12';
+
   return (
     <div
       className={clsx(
         'card bg-white border border-slate-200/80 rounded-2xl shadow-2xs transition-all duration-200',
         hover && 'card-hover',
-        paddingStyles[padding],
+        resolvedPadding,
         className
       )}
       {...props}

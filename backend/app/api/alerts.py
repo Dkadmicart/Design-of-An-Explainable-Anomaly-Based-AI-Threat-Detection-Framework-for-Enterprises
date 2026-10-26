@@ -1,18 +1,13 @@
 """Alerts API routes."""
 from fastapi import APIRouter, Query, Depends, HTTPException
-from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.database.session import get_db
 from app.models.database import Alert, AlertStatus, SeverityLevel
+from app.schemas import AlertAction
 
 router = APIRouter()
-
-
-class AlertAction(BaseModel):
-    """Request body for alert actions."""
-    notes: Optional[str] = None
 
 
 @router.get("")

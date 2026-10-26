@@ -6,8 +6,9 @@ from sqlalchemy import (
     Column, String, Integer, Float, Boolean, DateTime, Text, JSON,
     ForeignKey, Index, Enum as SAEnum
 )
-from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy.orm import DeclarativeBase, relationship, Mapped, mapped_column
 from datetime import datetime
+from typing import Optional
 import enum
 import uuid
 
@@ -108,7 +109,7 @@ class Event(Base):
     confidence = Column(Float, nullable=True)
     anomaly_score = Column(Float, nullable=True)
     risk_score = Column(Float, nullable=True)
-    attack_type = Column(String(50), nullable=True, index=True)
+    attack_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
     
     # Model info
     model_version = Column(String(50), nullable=True)
@@ -135,9 +136,9 @@ class Alert(Base):
     event_id = Column(String(36), ForeignKey("events.id"), nullable=False, index=True)
     
     # Alert details
-    severity = Column(SAEnum(SeverityLevel), nullable=False, index=True)
+    severity: Mapped[SeverityLevel] = mapped_column(SAEnum(SeverityLevel), nullable=False, index=True)
     attack_type = Column(String(50), nullable=False)
-    status = Column(SAEnum(AlertStatus), default=AlertStatus.NEW, index=True)
+    status: Mapped[AlertStatus] = mapped_column(SAEnum(AlertStatus), default=AlertStatus.NEW, index=True)
     
     # Scores
     risk_score = Column(Float, nullable=False)

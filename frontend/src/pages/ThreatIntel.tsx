@@ -65,7 +65,7 @@ export default function ThreatIntelPage() {
       </div>
 
       {/* Observed IOC Table Card */}
-      <Card p-6>
+      <Card padding="normal">
         <div className="mb-4">
           <h3 className="card-title">High-Risk Indicators of Compromise</h3>
           <p className="text-xs text-slate-500 mt-0.5">Endpoints exhibiting anomalous flow patterns</p>

@@ -1,15 +1,8 @@
 """Dataset Replay Engine API routes."""
 from fastapi import APIRouter
-from pydantic import BaseModel
-from typing import Optional
+from app.schemas import ReplayConfig
 
 router = APIRouter()
-
-
-class ReplayConfig(BaseModel):
-    """Replay configuration."""
-    speed: float = 1.0
-    dataset_file: Optional[str] = None
 
 
 @router.post("/start")
