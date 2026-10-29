@@ -29,7 +29,7 @@ export default function AnalyticsPage() {
       />
 
       {/* Class Distribution Chart Card */}
-      <Card p-6>
+      <Card p-6 className="min-w-0 overflow-hidden">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="card-title">Class Distribution (CIC-IDS2017 Benchmark Dataset)</h3>
@@ -38,7 +38,7 @@ export default function AnalyticsPage() {
         </div>
 
         {attacks.length > 0 ? (
-          <div className="h-[280px] w-full">
+          <div className="h-[280px] w-full min-w-0 overflow-hidden">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={attacks} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
@@ -69,8 +69,8 @@ export default function AnalyticsPage() {
       </Card>
 
       {/* Analytics Evaluation Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card p-6>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
+        <Card p-6 className="min-w-0 overflow-hidden">
           <h3 className="card-title mb-1">Confusion Matrix</h3>
           <p className="text-xs text-slate-500 mb-4">Classification performance metrics matrix</p>
           <EmptyState
@@ -82,7 +82,7 @@ export default function AnalyticsPage() {
           />
         </Card>
 
-        <Card p-6>
+        <Card p-6 className="min-w-0 overflow-hidden">
           <h3 className="card-title mb-1">ROC & Precision-Recall Curves</h3>
           <p className="text-xs text-slate-500 mb-4">Trade-off between detection rate and false positive rate</p>
           <EmptyState

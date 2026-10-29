@@ -29,14 +29,38 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const applyTheme = useCallback((currentTheme: Theme) => {
     const root = document.documentElement;
+    const body = document.body;
+
+    // Prevent any color fade, wash-out, or transition lag during theme switching
+    root.classList.add('theme-switching');
+
     root.setAttribute('data-theme', currentTheme);
+    if (body) {
+      body.setAttribute('data-theme', currentTheme);
+    }
+
     if (currentTheme === 'dark') {
       root.classList.add('dark');
       root.classList.remove('light');
+      if (body) {
+        body.classList.add('dark');
+        body.classList.remove('light');
+      }
     } else {
       root.classList.add('light');
       root.classList.remove('dark');
+      if (body) {
+        body.classList.add('light');
+        body.classList.remove('dark');
+      }
     }
+
+    // Remove theme-switching immediately after layout pass to restore normal micro-interactions
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        root.classList.remove('theme-switching');
+      });
+    });
   }, []);
 
   const setTheme = useCallback(

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Hexagon,
@@ -15,10 +15,6 @@ import {
   Moon,
   ArrowLeft,
   Zap,
-  UserPlus,
-  ChevronRight,
-  ChevronDown,
-  X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';

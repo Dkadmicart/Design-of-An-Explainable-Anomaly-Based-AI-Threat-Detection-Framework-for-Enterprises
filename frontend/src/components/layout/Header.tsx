@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, Bell, Menu, PanelLeftClose, PanelLeftOpen,
-  ChevronDown, LogOut, Shield, User as UserIcon, X, Sun, Moon
+  ChevronDown, LogOut, Shield, User as UserIcon, X, Sun, Moon,
+  Database, Radio
 } from 'lucide-react';
 import clsx from 'clsx';
 import type { EnvironmentMode } from '../../types';
@@ -26,7 +27,7 @@ export default function Header({
 }: HeaderProps) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { theme, toggleTheme, isLight } = useTheme();
+  const { toggleTheme, isLight } = useTheme();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -90,100 +91,112 @@ export default function Header({
 
   return (
     <>
-      <header className="h-[70px] bg-white border-b border-slate-200/80 flex items-center justify-between header-container flex-shrink-0 z-20 shadow-2xs select-none">
-        {/* Left Section: Sidebar Toggle + Global Search Bar */}
-        <div className="flex items-center gap-3 lg:gap-4 flex-1 min-w-0 mr-4">
+      <header className="h-[70px] bg-[var(--color-bg-header)] border-b border-[var(--color-border-base)] flex items-center justify-between px-4 sm:px-6 lg:px-6 gap-4 sm:gap-6 flex-shrink-0 z-20 shadow-2xs select-none backdrop-blur-md w-full min-w-0">
+        {/* Left Section: Sidebar Toggle + Responsive Search Bar */}
+        <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-[140px] max-w-[460px]">
           {/* Mobile Hamburger Drawer Button */}
           <button
             onClick={onMobileMenuOpen}
-            className="lg:hidden w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer flex-shrink-0"
+            className="lg:hidden w-10 h-10 flex items-center justify-center rounded-xl border border-[var(--color-border-base)] bg-[var(--color-bg-card)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text-main)] transition-colors cursor-pointer flex-shrink-0"
             aria-label="Open navigation menu"
           >
             <Menu size={19} />
           </button>
 
-          {/* Desktop Sidebar Collapse / Expand Toggle Button */}
+          {/* Desktop Sidebar Collapse / Expand Toggle Button (clean clearance from sidebar) */}
           <button
             onClick={onSidebarToggle}
-            className="hidden lg:flex w-10 h-10 items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer flex-shrink-0"
+            className="hidden lg:flex w-10 h-10 items-center justify-center rounded-xl border border-[var(--color-border-base)] bg-[var(--color-bg-card)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text-main)] transition-colors cursor-pointer flex-shrink-0"
             title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {sidebarCollapsed ? <PanelLeftOpen size={19} /> : <PanelLeftClose size={19} />}
           </button>
 
-          {/* Global Search Bar */}
-          <div className="relative w-full max-w-[520px] min-w-0 flex-shrink">
+          {/* Global Search Bar (Intelligently shrinks first when space is limited) */}
+          <div className="relative w-full flex-1 min-w-[120px]">
             <Search
               size={16}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none"
             />
             <input
               type="text"
               placeholder="Search events, IPs, alerts..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="input input-has-icon pr-3 py-2 h-[46px] text-sm bg-slate-50 border-slate-200 focus:bg-white focus:border-amber-400 rounded-xl font-medium w-full min-w-0"
+              className="input input-has-icon pr-3 py-2 h-[42px] text-xs md:text-sm bg-[var(--color-bg-subtle)] border-[var(--color-border-base)] text-[var(--color-text-main)] placeholder-[var(--color-text-muted)] focus:bg-[var(--color-bg-card)] focus:border-amber-400 rounded-xl font-medium w-full min-w-0 transition-all"
             />
           </div>
         </div>
 
-        {/* Right Controls: Telemetry Switch + System Health + Notifications + User Profile */}
-        <div className="flex items-center gap-3 lg:gap-3.5 flex-shrink-0">
-          {/* Segmented Telemetry Mode Control */}
-          <div className="hidden sm:inline-flex items-center bg-slate-100/90 rounded-xl p-1 border border-slate-200/80 gap-1 flex-shrink-0">
+        {/* Center Section: Unified Binary Telemetry Switcher (One Single Binary Section) */}
+        <div className="flex items-center justify-center flex-shrink-0">
+          <div
+            className="hidden sm:inline-flex items-center bg-[var(--color-bg-subtle)] p-1 rounded-xl border border-[var(--color-border-base)] shadow-2xs gap-1 flex-shrink-0 select-none"
+            role="group"
+            aria-label="Telemetry Environment Mode"
+          >
+            {/* Binary Option 1: Dataset Replay */}
             <button
               type="button"
               onClick={() => onModeChange('replay')}
               className={clsx(
-                'px-4 py-2 rounded-lg text-xs font-extrabold transition-all cursor-pointer select-none whitespace-nowrap flex items-center justify-center',
+                'px-4 lg:px-5 py-2 h-[38px] min-w-[130px] lg:min-w-[145px] rounded-lg text-xs font-extrabold cursor-pointer select-none whitespace-nowrap flex items-center justify-center gap-2 transition-all duration-150',
                 mode === 'replay'
-                  ? 'bg-[#F5B700] text-slate-950 shadow-xs ring-1 ring-amber-400/40'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  ? 'bg-[#F5B700] text-slate-950 font-black shadow-xs ring-1 ring-amber-400/50'
+                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] hover:bg-[var(--color-bg-card)]'
               )}
+              title="Switch to Historical Dataset Replay Mode"
             >
-              Dataset Replay
+              <Database size={14} className={mode === 'replay' ? 'text-slate-950 flex-shrink-0' : 'text-[var(--color-text-muted)] flex-shrink-0'} />
+              <span>Dataset Replay</span>
             </button>
+
+            {/* Binary Option 2: Live Telemetry */}
             <button
               type="button"
               onClick={() => onModeChange('live')}
               className={clsx(
-                'px-4 py-2 rounded-lg text-xs font-extrabold transition-all cursor-pointer select-none whitespace-nowrap flex items-center justify-center',
+                'px-4 lg:px-5 py-2 h-[38px] min-w-[130px] lg:min-w-[145px] rounded-lg text-xs font-extrabold cursor-pointer select-none whitespace-nowrap flex items-center justify-center gap-2 transition-all duration-150',
                 mode === 'live'
-                  ? 'bg-[#F5B700] text-slate-950 shadow-xs ring-1 ring-amber-400/40'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  ? 'bg-[#F5B700] text-slate-950 font-black shadow-xs ring-1 ring-amber-400/50'
+                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] hover:bg-[var(--color-bg-card)]'
               )}
+              title="Switch to Real-time Live Network Telemetry Mode"
             >
-              Live Telemetry
+              <Radio size={14} className={mode === 'live' ? 'text-slate-950 flex-shrink-0' : 'text-[var(--color-text-muted)] flex-shrink-0'} />
+              <span>Live Telemetry</span>
+              {mode === 'live' ? (
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-pulse ml-0.5" />
+              ) : (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 opacity-60 ml-0.5" />
+              )}
             </button>
           </div>
+        </div>
 
-          {/* System Health Status Button */}
-          <button
-            onClick={() => navigate('/system-health')}
-            className="hidden xl:flex items-center gap-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 px-3.5 py-2 rounded-xl border border-slate-200/80 transition-colors cursor-pointer shadow-2xs"
-            title="View System Infrastructure Status"
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>System Healthy</span>
-          </button>
-
+        {/* Right Section: Action Utilities Cluster (Notifications + Theme Switcher + User Profile) */}
+        <div className="flex items-center gap-2.5 sm:gap-3 flex-shrink-0">
           {/* Notifications Button */}
           <button
-            className="relative w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200/80 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer flex-shrink-0 shadow-2xs"
+            className="relative w-10 h-10 flex items-center justify-center rounded-xl border border-[var(--color-border-base)] bg-[var(--color-bg-card)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text-main)] transition-colors cursor-pointer flex-shrink-0 shadow-2xs"
             aria-label="Notifications"
             title="Notifications"
           >
             <Bell size={18} />
-            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
+            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
           </button>
 
-          {/* Theme Toggle Button */}
+          {/* Theme Regulator Button (Instant toggle, No Color Fade) */}
           <button
+            type="button"
             onClick={toggleTheme}
-            className={`theme-toggle rounded-full ${isLight ? 'border-slate-300' : 'border-white/20'}`}
-            aria-label="Toggle dark/light theme"
-            title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+            className={clsx(
+              'theme-toggle rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400/40 flex-shrink-0',
+              isLight ? 'border-slate-300' : 'border-amber-400/30'
+            )}
+            aria-label={`Switch to ${isLight ? 'dark' : 'light'} theme`}
+            title={isLight ? 'Switch to Dark Mode (Enterprise SOC)' : 'Switch to Light Mode'}
           >
             <div className="theme-toggle-knob rounded-full">
               {isLight ? (
@@ -199,7 +212,7 @@ export default function Header({
             <button
               type="button"
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center gap-3 pl-3.5 border-l border-slate-200/80 cursor-pointer hover:bg-slate-50/80 py-1.5 px-2 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-amber-400/30"
+              className="flex items-center gap-3 pl-3.5 border-l border-[var(--color-border-base)] cursor-pointer hover:bg-[var(--color-bg-subtle)] py-1.5 px-2 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-amber-400/30"
               aria-expanded={dropdownOpen}
               aria-label="User profile and settings menu"
             >
@@ -227,7 +240,7 @@ export default function Header({
                 )}
                 <span
                   className={clsx(
-                    'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white',
+                    'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-900',
                     isGoogleUser ? 'bg-blue-500' : 'bg-emerald-500'
                   )}
                   title={isGoogleUser ? 'Google Workspace SSO' : 'Active Session'}
@@ -236,26 +249,26 @@ export default function Header({
               <div className="hidden lg:flex flex-col text-left min-w-0 max-w-[210px]">
                 <div className="flex items-center gap-1.5 truncate">
                   <span
-                    className="text-xs font-bold text-slate-900 leading-tight truncate"
+                    className="text-xs font-bold text-[var(--color-text-main)] leading-tight truncate"
                     title={user?.display_name || userLoginId}
                   >
                     {user?.display_name || userLoginId}
                   </span>
                   {isGoogleUser && (
-                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 bg-blue-50 text-blue-600 border border-blue-200/80 rounded">
+                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 bg-blue-50 text-blue-600 border border-blue-200/80 rounded dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800/60">
                       GOOGLE
                     </span>
                   )}
                 </div>
-                <span className="text-[10px] font-semibold text-slate-500 uppercase leading-tight tracking-wider truncate mt-0.5 font-mono">
+                <span className="text-[10px] font-semibold text-[var(--color-text-muted)] uppercase leading-tight tracking-wider truncate mt-0.5 font-mono">
                   {user?.email || roleLabel}
                 </span>
               </div>
               <ChevronDown
                 size={14}
                 className={clsx(
-                  'hidden lg:block text-slate-400 ml-0.5 transition-transform duration-150',
-                  dropdownOpen && 'rotate-180 text-slate-700'
+                  'hidden lg:block text-[var(--color-text-muted)] ml-0.5 transition-transform duration-150',
+                  dropdownOpen && 'rotate-180 text-[var(--color-text-main)]'
                 )}
               />
             </button>
@@ -265,10 +278,10 @@ export default function Header({
               <div className="profile-dropdown-menu animate-fade-in" role="menu">
                 {/* Header info card */}
                 <div className="profile-dropdown-header">
-                  <div className="profile-dropdown-name truncate font-mono text-xs font-black text-slate-900">
+                  <div className="profile-dropdown-name truncate font-mono text-xs font-black text-[var(--color-text-main)]">
                     {userLoginId}
                   </div>
-                  <div className="profile-dropdown-email text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                  <div className="profile-dropdown-email text-[11px] text-[var(--color-text-muted)] font-medium truncate mt-0.5">
                     {user?.display_name && user.display_name !== userLoginId
                       ? `Profile: ${user.display_name}`
                       : 'Authenticated User ID'}
@@ -289,7 +302,7 @@ export default function Header({
                     className="profile-dropdown-item"
                     role="menuitem"
                   >
-                    <UserIcon size={16} className="text-slate-400 flex-shrink-0" />
+                    <UserIcon size={16} className="text-[var(--color-text-muted)] flex-shrink-0" />
                     <span>Profile Information</span>
                   </button>
 
@@ -301,13 +314,13 @@ export default function Header({
                     className="profile-dropdown-item"
                     role="menuitem"
                   >
-                    <Shield size={16} className="text-slate-400 flex-shrink-0" />
+                    <Shield size={16} className="text-[var(--color-text-muted)] flex-shrink-0" />
                     <span>Security Settings</span>
                   </button>
                 </div>
 
                 {/* Subtle Divider */}
-                <div className="border-t border-slate-100 my-1" />
+                <div className="border-t border-[var(--color-border-subtle)] my-1" />
 
                 {/* Sign out */}
                 <div>
@@ -328,18 +341,18 @@ export default function Header({
 
       {/* Profile Details Modal */}
       {profileModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-[var(--color-bg-card)] rounded-2xl border border-[var(--color-border-base)] shadow-2xl max-w-md w-full p-6 space-y-5">
+            <div className="flex items-center justify-between border-b border-[var(--color-border-subtle)] pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 font-extrabold text-xs flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-500 font-extrabold text-xs flex items-center justify-center ring-1 ring-amber-500/30">
                   {getInitials(user?.display_name)}
                 </div>
-                <h3 className="text-sm font-extrabold text-slate-900">User Identity Profile</h3>
+                <h3 className="text-sm font-extrabold text-[var(--color-text-main)]">User Identity Profile</h3>
               </div>
               <button
                 onClick={() => setProfileModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-[var(--color-text-muted)] hover:text-[var(--color-text-main)] p-1 rounded-lg cursor-pointer transition-colors"
               >
                 <X size={18} />
               </button>
@@ -347,55 +360,55 @@ export default function Header({
 
             <div className="space-y-3 text-xs">
               <div>
-                <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px] block mb-0.5">
+                <span className="font-bold text-[var(--color-text-muted)] uppercase tracking-wider text-[10px] block mb-0.5">
                   Full Name
                 </span>
-                <span className="font-extrabold text-slate-900">{user?.display_name}</span>
+                <span className="font-extrabold text-[var(--color-text-main)]">{user?.display_name}</span>
               </div>
 
               <div>
-                <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px] block mb-0.5">
+                <span className="font-bold text-[var(--color-text-muted)] uppercase tracking-wider text-[10px] block mb-0.5">
                   User Identity / Login ID
                 </span>
-                <span className="font-mono font-bold text-slate-800 text-xs">{userLoginId}</span>
+                <span className="font-mono font-bold text-[var(--color-text-body)] text-xs">{userLoginId}</span>
               </div>
 
               <div>
-                <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px] block mb-0.5">
+                <span className="font-bold text-[var(--color-text-muted)] uppercase tracking-wider text-[10px] block mb-0.5">
                   Security Clearance / Role
                 </span>
-                <span className="font-bold text-slate-800 px-2 py-0.5 bg-slate-100 rounded border border-slate-200">
+                <span className="font-bold text-[var(--color-text-main)] px-2 py-0.5 bg-[var(--color-bg-subtle)] rounded border border-[var(--color-border-base)]">
                   {user?.role}
                 </span>
               </div>
 
               <div>
-                <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px] block mb-0.5">
+                <span className="font-bold text-[var(--color-text-muted)] uppercase tracking-wider text-[10px] block mb-0.5">
                   Account Status
                 </span>
-                <span className="font-bold text-emerald-700 px-2 py-0.5 bg-emerald-50 rounded border border-emerald-200">
+                <span className="font-bold text-emerald-500 px-2 py-0.5 bg-emerald-500/10 rounded border border-emerald-500/20">
                   Active Enterprise Account
                 </span>
               </div>
 
               <div>
-                <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px] block mb-0.5">
+                <span className="font-bold text-[var(--color-text-muted)] uppercase tracking-wider text-[10px] block mb-0.5">
                   Authentication Providers
                 </span>
                 <div className="flex gap-1.5 mt-1">
                   {user?.auth_providers?.map((p) => (
-                    <span key={p} className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10.5px] font-mono">
+                    <span key={p} className="px-2 py-0.5 bg-[var(--color-bg-subtle)] text-[var(--color-text-body)] rounded text-[10.5px] font-mono border border-[var(--color-border-subtle)]">
                       {p}
                     </span>
-                  )) || <span className="text-slate-500">PASSWORD</span>}
+                  )) || <span className="text-[var(--color-text-muted)]">PASSWORD</span>}
                 </div>
               </div>
             </div>
 
-            <div className="pt-3 border-t border-slate-100 flex justify-end">
+            <div className="pt-3 border-t border-[var(--color-border-subtle)] flex justify-end">
               <button
                 onClick={() => setProfileModalOpen(false)}
-                className="btn btn-secondary text-xs px-4 py-2 font-bold"
+                className="btn btn-secondary text-xs px-4 py-2 font-bold cursor-pointer"
               >
                 Close
               </button>

@@ -42,7 +42,7 @@ export function Card({
   return (
     <div
       className={clsx(
-        'card bg-white border border-slate-200/80 rounded-2xl shadow-2xs transition-all duration-200',
+        'card rounded-2xl shadow-2xs',
         hover && 'card-hover',
         resolvedPadding,
         className
@@ -66,7 +66,7 @@ export function CardHeader({ title, subtitle, action, className }: CardHeaderPro
     <div className={clsx('flex items-start justify-between gap-4 mb-4', className)}>
       <div>
         <h3 className="card-title">{title}</h3>
-        {subtitle && <p className="text-xs font-medium text-slate-500 mt-1">{subtitle}</p>}
+        {subtitle && <p className="text-xs font-medium text-[var(--color-text-muted)] mt-1">{subtitle}</p>}
       </div>
       {action && <div className="flex-shrink-0">{action}</div>}
     </div>

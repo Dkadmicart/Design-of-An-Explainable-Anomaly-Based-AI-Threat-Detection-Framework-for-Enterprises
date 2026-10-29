@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Loader2, AlertCircle, Info, ExternalLink, X, ShieldCheck, Check } from 'lucide-react';
+import { Loader2, AlertCircle, ExternalLink, X, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -74,6 +74,7 @@ export const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
   };
 
   const tokenClientRef = useRef<any>(null);
+  const isInitializedRef = useRef(false);
   const [gisButtonRendered, setGisButtonRendered] = useState(false);
 
   // ━━━━ INITIALIZE GOOGLE IDENTITY SERVICES (GIS) ━━━━
@@ -86,8 +87,8 @@ export const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
     const initGIS = () => {
       if (!window.google) return;
 
-      // 1. Initialize Google Identity Services (GIS) ID Token & One Tap
-      if (window.google.accounts?.id && googleBtnContainerRef.current) {
+      // 1. Initialize Google Identity Services (GIS) ID Token & One Tap (Call once)
+      if (window.google.accounts?.id && !isInitializedRef.current) {
         try {
           window.google.accounts.id.initialize({
             client_id: clientId,
@@ -102,8 +103,15 @@ export const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
             cancel_on_tap_outside: true,
             context: buttonText === 'signup_with' ? 'signup' : 'signin',
           });
+          isInitializedRef.current = true;
+        } catch (e: any) {
+          console.warn('[Google GIS ID] Initialization warning:', e);
+        }
+      }
 
-          // Render official Google branded button
+      // Render button if container is ready
+      if (window.google.accounts?.id && googleBtnContainerRef.current) {
+        try {
           googleBtnContainerRef.current.innerHTML = '';
           window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
             type: 'standard',
@@ -122,7 +130,7 @@ export const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
             }
           }, 350);
         } catch (e: any) {
-          console.warn('[Google GIS ID] Initialization warning:', e);
+          console.warn('[Google GIS ID] Render warning:', e);
         }
       }
 

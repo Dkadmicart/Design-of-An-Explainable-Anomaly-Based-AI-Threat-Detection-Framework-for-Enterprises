@@ -26,15 +26,15 @@ export function EmptyState({
   className,
 }: EmptyStateProps) {
   const iconVariants = {
-    normal: 'bg-slate-100 text-slate-600 border-slate-200',
-    amber: 'bg-amber-500/10 text-amber-600 border-amber-200',
-    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+    normal: 'bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] border-[var(--color-border-base)]',
+    amber: 'bg-amber-500/10 text-amber-500 border-amber-500/30',
+    emerald: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30',
   };
 
   return (
     <div
       className={clsx(
-        'w-full flex flex-col items-center justify-center border border-dashed border-slate-200/90 rounded-2xl bg-slate-50/60 text-center p-6 space-y-3.5',
+        'w-full flex flex-col items-center justify-center border border-dashed border-[var(--color-border-base)] rounded-2xl bg-[var(--color-empty-bg)] text-center p-6 space-y-3.5',
         minHeight,
         className
       )}
@@ -49,8 +49,8 @@ export function EmptyState({
       </div>
 
       <div className="max-w-sm space-y-1">
-        <h4 className="text-sm font-bold text-slate-900">{title}</h4>
-        <p className="text-xs text-slate-500 font-medium leading-relaxed">{description}</p>
+        <h4 className="text-sm font-bold text-[var(--color-text-main)]">{title}</h4>
+        <p className="text-xs text-[var(--color-text-muted)] font-medium leading-relaxed">{description}</p>
       </div>
 
       {action && (

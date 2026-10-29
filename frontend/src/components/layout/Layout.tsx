@@ -30,8 +30,8 @@ export default function Layout() {
   }, [sidebarCollapsed]);
 
   return (
-    <div className="flex w-full min-h-screen overflow-x-hidden bg-slate-100/80 text-slate-900 font-sans antialiased">
-      {/* Sidebar Component (flex item with flex-shrink-0) */}
+    <div className="flex w-full h-screen max-h-screen overflow-hidden overflow-x-hidden bg-[var(--color-bg-base)] text-[var(--color-text-main)] font-sans antialiased selection:bg-amber-400 selection:text-slate-950">
+      {/* Sidebar Component (Fixed in viewport, non-scrollable horizontally) */}
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -39,8 +39,8 @@ export default function Layout() {
         onMobileClose={() => setMobileOpen(false)}
       />
 
-      {/* MainArea: occupies 100% of remaining available width */}
-      <div className="flex-1 flex flex-col min-w-0 w-0 overflow-x-hidden bg-slate-50 border-l border-slate-200/80">
+      {/* MainArea: occupies 100% of remaining available width, header stays fixed, only content scrolls */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen max-h-screen overflow-hidden overflow-x-hidden bg-[var(--color-bg-content)]">
         <Header
           mode={mode}
           onModeChange={setMode}
@@ -49,9 +49,9 @@ export default function Layout() {
           onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
 
-        {/* Main Content Area */}
-        <main className="flex-1 main-content-area overflow-y-auto min-w-0 scroll-smooth">
-          <div className="max-w-[1600px] mx-auto space-y-6 lg:space-y-8 min-w-0">
+        {/* Main Content Area - ONLY this panel scrolls vertically */}
+        <main className="flex-1 min-w-0 h-full main-content-area overflow-y-auto overflow-x-hidden scroll-smooth">
+          <div className="w-full max-w-[1600px] mx-auto space-y-6 lg:space-y-8 min-w-0">
             <Outlet context={{ mode }} />
           </div>
         </main>

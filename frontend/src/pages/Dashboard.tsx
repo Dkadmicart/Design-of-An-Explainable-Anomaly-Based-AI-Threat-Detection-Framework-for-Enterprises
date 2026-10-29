@@ -10,6 +10,7 @@ import {
 import clsx from 'clsx';
 import { api } from '../services/api';
 import type { DashboardSummary, Alert, AttackDistribution, ModelStatusInfo, TopSource, RiskDistribution } from '../types';
+import { useTheme } from '../context/ThemeContext';
 import { PageContainer, PageHeader } from '../components/common/PageContainer';
 import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
@@ -35,20 +36,20 @@ function KPICard({ label, value, icon: Icon, description, highlight }: KPICardPr
       p-5
       className={clsx(
         'h-full flex flex-col justify-between',
-        highlight === 'critical' && 'border-l-4 border-l-red-500 bg-gradient-to-br from-white to-red-50/30',
-        highlight === 'warning' && 'border-l-4 border-l-amber-500 bg-gradient-to-br from-white to-amber-50/30'
+        highlight === 'critical' && 'border-l-4 border-l-red-500 bg-gradient-to-br from-[var(--color-bg-card)] to-red-500/10',
+        highlight === 'warning' && 'border-l-4 border-l-amber-500 bg-gradient-to-br from-[var(--color-bg-card)] to-amber-500/10'
       )}
     >
       <div>
         <div className="flex items-center justify-between gap-2 mb-3">
-          <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
+          <span className="text-[11px] font-extrabold text-[var(--color-text-muted)] uppercase tracking-wider">
             {label}
           </span>
           <div className={clsx(
             'w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0',
-            highlight === 'critical' ? 'bg-red-50 text-red-600 border border-red-200' :
-            highlight === 'warning' ? 'bg-amber-50 text-amber-600 border border-amber-200' :
-            'bg-slate-100 text-slate-700 border border-slate-200'
+            highlight === 'critical' ? 'bg-red-500/10 text-red-500 border border-red-500/20' :
+            highlight === 'warning' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
+            'bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] border border-[var(--color-border-base)]'
           )}>
             <Icon size={18} strokeWidth={2.2} />
           </div>
@@ -56,13 +57,13 @@ function KPICard({ label, value, icon: Icon, description, highlight }: KPICardPr
 
         <div className="flex items-baseline justify-start gap-2 mt-1 min-h-[44px]">
           {isStringValue ? (
-            <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold text-slate-500 bg-slate-100 border border-slate-200/80">
+            <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold text-[var(--color-text-muted)] bg-[var(--color-bg-subtle)] border border-[var(--color-border-base)]">
               {value}
             </span>
           ) : (
             <span className={clsx(
               'kpi-value text-3xl lg:text-4xl font-extrabold tracking-tight',
-              highlight === 'critical' ? 'text-red-600' : 'text-slate-900'
+              highlight === 'critical' ? 'text-red-500' : 'text-[var(--color-text-main)]'
             )}>
               {typeof value === 'number' ? value.toLocaleString() : value}
             </span>
@@ -70,7 +71,7 @@ function KPICard({ label, value, icon: Icon, description, highlight }: KPICardPr
         </div>
       </div>
 
-      <p className="text-xs text-slate-500 font-medium mt-4 pt-3 border-t border-slate-100">
+      <p className="text-xs text-[var(--color-text-muted)] font-medium mt-4 pt-3 border-t border-[var(--color-border-subtle)]">
         {description}
       </p>
     </Card>
@@ -99,6 +100,7 @@ const RISK_COLORS: Record<string, string> = {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const { isLight } = useTheme();
   const [summary, setSummary] = useState<DashboardSummary>({
     total_events: 0,
     normal_events: 0,
@@ -121,6 +123,24 @@ export default function DashboardPage() {
     api.getAlerts({ page_size: 6 }).then(res => setAlerts(res.alerts)).catch(console.error);
     api.getAttackDistribution().then(res => setAttacks(res.distribution.filter(a => a.type !== 'BENIGN'))).catch(console.error);
   }, []);
+
+  // Real-time live clock state ticking every second (zero layout shift with tabular-nums)
+  const [liveClock, setLiveClock] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setLiveClock(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const dashHH = String(liveClock.getHours()).padStart(2, '0');
+  const dashMM = String(liveClock.getMinutes()).padStart(2, '0');
+  const dashSS = String(liveClock.getSeconds()).padStart(2, '0');
+  const dashFormattedTime = `${dashHH}:${dashMM}:${dashSS}`;
+  const dashFormattedDate = liveClock.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 
   const timeline: { time: string; normal: number; suspicious: number; critical: number }[] = [];
   const sources: TopSource[] = [];
@@ -146,9 +166,16 @@ export default function DashboardPage() {
         title="Security Operations Overview"
         subtitle="Monitor network activity, identify threats, and investigate security incidents."
         actions={
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs">
-            <Clock size={15} className="text-slate-400" />
-            <span>Updated: {new Date().toLocaleTimeString()}</span>
+          <div className="flex items-center gap-2.5 text-xs font-bold text-[var(--color-text-body)] bg-[var(--color-bg-card)] px-3.5 py-2 rounded-xl border border-[var(--color-border-base)] shadow-2xs select-none">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+            <Clock size={14} className="text-[var(--color-text-muted)] flex-shrink-0" />
+            <span className="font-mono tabular-nums font-extrabold text-[var(--color-text-main)] min-w-[62px] text-center">
+              {dashFormattedTime}
+            </span>
+            <span className="text-[var(--color-border-strong)] opacity-60">|</span>
+            <span className="text-[var(--color-text-muted)] font-semibold text-[11px] whitespace-nowrap">
+              {dashFormattedDate}
+            </span>
           </div>
         }
       />
@@ -190,29 +217,30 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="card-title">Threat Activity Timeline</h3>
-              <p className="text-xs text-slate-500 mt-0.5">24-hour event volume (Normal vs Suspicious vs Critical)</p>
+              <p className="text-xs text-[var(--color-text-muted)] mt-0.5">24-hour event volume (Normal vs Suspicious vs Critical)</p>
             </div>
           </div>
           
           {timeline.length > 0 ? (
-            <div className="h-[240px] w-full">
+            <div className="h-[240px] w-full min-w-0 overflow-hidden">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={timeline} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                  <XAxis dataKey="time" tick={{ fontSize: 11 }} stroke="#94A3B8" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="#94A3B8" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.06)'} />
+                  <XAxis dataKey="time" tick={{ fontSize: 11 }} stroke={isLight ? '#94A3B8' : '#64748B'} />
+                  <YAxis tick={{ fontSize: 11 }} stroke={isLight ? '#94A3B8' : '#64748B'} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #E2E8F0',
+                      backgroundColor: isLight ? '#FFFFFF' : '#0F172A',
+                      border: isLight ? '1px solid #E2E8F0' : '1px solid rgba(255, 255, 255, 0.12)',
                       borderRadius: '12px',
+                      color: isLight ? '#0F172A' : '#F8FAFC',
                       fontSize: '13px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      boxShadow: isLight ? '0 4px 12px rgba(0,0,0,0.08)' : '0 8px 24px rgba(0,0,0,0.4)',
                     }}
                   />
-                  <Area type="monotone" dataKey="normal" stackId="1" stroke="#94A3B8" fill="#F1F5F9" name="Normal Traffic" />
-                  <Area type="monotone" dataKey="suspicious" stackId="1" stroke="#F5B700" fill="#FEF3C7" name="Suspicious Activity" />
-                  <Area type="monotone" dataKey="critical" stackId="1" stroke="#EF4444" fill="#FEE2E2" name="Critical Events" />
+                  <Area type="monotone" dataKey="normal" stackId="1" stroke="#94A3B8" fill={isLight ? '#F1F5F9' : '#1E293B'} name="Normal Traffic" />
+                  <Area type="monotone" dataKey="suspicious" stackId="1" stroke="#F5B700" fill={isLight ? '#FEF3C7' : 'rgba(245, 183, 0, 0.2)'} name="Suspicious Activity" />
+                  <Area type="monotone" dataKey="critical" stackId="1" stroke="#EF4444" fill={isLight ? '#FEE2E2' : 'rgba(239, 68, 68, 0.2)'} name="Critical Events" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -229,15 +257,15 @@ export default function DashboardPage() {
         </Card>
 
         {/* Attack Vector Distribution Donut */}
-        <Card p-6 className="h-full flex flex-col justify-between">
+        <Card p-6 className="h-full flex flex-col justify-between min-w-0">
           <div>
             <h3 className="card-title">Attack Vector Distribution</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Categorized attack classifications</p>
+            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Categorized attack classifications</p>
           </div>
 
           {attacks.length > 0 ? (
             <>
-              <div className="h-[180px] w-full my-2">
+              <div className="h-[180px] w-full my-2 min-w-0 overflow-hidden">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -257,23 +285,24 @@ export default function DashboardPage() {
                     <Tooltip
                       formatter={(value: any) => (value ?? 0).toLocaleString()}
                       contentStyle={{
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid #E2E8F0',
+                        backgroundColor: isLight ? '#FFFFFF' : '#0F172A',
+                        border: isLight ? '1px solid #E2E8F0' : '1px solid rgba(255, 255, 255, 0.12)',
                         borderRadius: '10px',
+                        color: isLight ? '#0F172A' : '#F8FAFC',
                         fontSize: '13px',
                       }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-xs pt-3 border-t border-slate-100">
+              <div className="grid grid-cols-2 gap-2 text-xs pt-3 border-t border-[var(--color-border-subtle)]">
                 {attacks.map((a) => (
                   <div key={a.type} className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: ATTACK_COLORS[a.type] }} />
-                      <span className="text-slate-600 truncate font-medium">{a.type}</span>
+                      <span className="text-[var(--color-text-muted)] truncate font-medium">{a.type}</span>
                     </div>
-                    <span className="font-bold text-slate-900 ml-1">{a.percentage}%</span>
+                    <span className="font-bold text-[var(--color-text-main)] ml-1">{a.percentage}%</span>
                   </div>
                 ))}
               </div>
@@ -297,7 +326,7 @@ export default function DashboardPage() {
         <Card p-6 className="lg:col-span-1 flex flex-col justify-between">
           <div>
             <h3 className="card-title mb-1">Threat Risk Summary</h3>
-            <p className="text-xs text-slate-500 mb-5">Event severity scores breakdown</p>
+            <p className="text-xs text-[var(--color-text-muted)] mb-5">Event severity scores breakdown</p>
             <div className="space-y-4">
               {risks.map((r) => {
                 const total = risks.reduce((s, x) => s + x.count, 0);
@@ -305,8 +334,8 @@ export default function DashboardPage() {
                 return (
                   <div key={r.category} className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs font-semibold">
-                      <span className="text-slate-600">{r.category}</span>
-                      <span className="text-slate-900 font-bold">{r.count.toLocaleString()} <span className="text-slate-400 font-normal">({pct}%)</span></span>
+                      <span className="text-[var(--color-text-muted)]">{r.category}</span>
+                      <span className="text-[var(--color-text-main)] font-bold">{r.count.toLocaleString()} <span className="text-[var(--color-text-muted)] font-normal">({pct}%)</span></span>
                     </div>
                     <div className="progress-bar">
                       <div
@@ -322,7 +351,7 @@ export default function DashboardPage() {
               })}
             </div>
           </div>
-          <div className="mt-6 pt-4 border-t border-slate-100 text-xs text-slate-400 font-medium">
+          <div className="mt-6 pt-4 border-t border-[var(--color-border-subtle)] text-xs text-[var(--color-text-muted)] font-medium">
             Calculated dynamically based on anomaly confidence and severity rules.
           </div>
         </Card>
@@ -332,11 +361,11 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="card-title">Recent Security Alerts</h3>
-              <p className="text-xs text-slate-500">Click any alert row to open investigation workspace</p>
+              <p className="text-xs text-[var(--color-text-muted)]">Click any alert row to open investigation workspace</p>
             </div>
             <button
               onClick={() => navigate('/alerts')}
-              className="text-xs font-bold text-[#B45309] hover:underline flex items-center gap-1 cursor-pointer"
+              className="text-xs font-bold text-amber-500 hover:underline flex items-center gap-1 cursor-pointer"
             >
               <span>View All Alerts</span>
               <ArrowRight size={14} />
@@ -370,25 +399,25 @@ export default function DashboardPage() {
                   <tr
                     key={alert.id}
                     className={clsx(
-                      'cursor-pointer group hover:bg-slate-50',
+                      'cursor-pointer group hover:bg-[var(--color-table-hover)]',
                       alert.severity === 'CRITICAL' && 'row-critical',
                       alert.severity === 'HIGH' && 'row-high'
                     )}
                     onClick={() => navigate(`/alerts/${alert.id}`)}
                   >
-                    <td className="text-xs font-mono text-slate-500 whitespace-nowrap">
+                    <td className="text-xs font-mono text-[var(--color-text-muted)] whitespace-nowrap">
                       {new Date(alert.created_at).toLocaleTimeString()}
                     </td>
                     <td><SeverityBadge severity={alert.severity} /></td>
-                    <td className="text-xs font-bold text-slate-900">{alert.attack_type}</td>
-                    <td className="text-xs font-mono font-bold text-slate-900">{alert.source_ip}</td>
-                    <td className="text-xs font-mono text-slate-600">{alert.destination_ip}</td>
+                    <td className="text-xs font-bold text-[var(--color-text-main)]">{alert.attack_type}</td>
+                    <td className="text-xs font-mono font-bold text-[var(--color-text-main)]">{alert.source_ip}</td>
+                    <td className="text-xs font-mono text-[var(--color-text-muted)]">{alert.destination_ip}</td>
                     <td>
                       <span className={clsx(
                         'text-xs font-extrabold px-2 py-0.5 rounded',
-                        alert.risk_score >= 75 ? 'bg-red-50 text-red-700' :
-                        alert.risk_score >= 50 ? 'bg-amber-50 text-amber-700' :
-                        'text-slate-600'
+                        alert.risk_score >= 75 ? 'bg-red-500/10 text-red-500 border border-red-500/20' :
+                        alert.risk_score >= 50 ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
+                        'text-[var(--color-text-muted)]'
                       )}>
                         {alert.risk_score}
                       </span>
@@ -418,7 +447,7 @@ export default function DashboardPage() {
         <Card p-6>
           <div className="mb-4">
             <h3 className="card-title">Top Suspicious Sources</h3>
-            <p className="text-xs text-slate-500">Highest risk originating network addresses</p>
+            <p className="text-xs text-[var(--color-text-muted)]">Highest risk originating network addresses</p>
           </div>
           {sources.length === 0 ? (
             <EmptyState
@@ -441,19 +470,19 @@ export default function DashboardPage() {
               <tbody>
                 {sources.map((s) => (
                   <tr key={s.ip}>
-                    <td className="text-xs font-mono font-bold text-slate-900">{s.ip}</td>
-                    <td className="text-xs font-semibold text-slate-600">{s.events} events</td>
+                    <td className="text-xs font-mono font-bold text-[var(--color-text-main)]">{s.ip}</td>
+                    <td className="text-xs font-semibold text-[var(--color-text-muted)]">{s.events} events</td>
                     <td>
                       <span className={clsx(
                         'text-xs font-extrabold px-2 py-0.5 rounded',
-                        s.risk_score >= 75 ? 'bg-red-50 text-red-700' :
-                        s.risk_score >= 50 ? 'bg-amber-50 text-amber-700' :
-                        'text-slate-600'
+                        s.risk_score >= 75 ? 'bg-red-500/10 text-red-500 border border-red-500/20' :
+                        s.risk_score >= 50 ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
+                        'text-[var(--color-text-muted)]'
                       )}>
                         {s.risk_score}
                       </span>
                     </td>
-                    <td className="text-xs text-slate-500">
+                    <td className="text-xs text-[var(--color-text-muted)]">
                       {new Date(s.last_seen).toLocaleTimeString()}
                     </td>
                   </tr>
@@ -469,7 +498,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="card-title">Active ML Model Status</h3>
-                <p className="text-xs text-slate-500">Detection engine operational status</p>
+                <p className="text-xs text-[var(--color-text-muted)]">Detection engine operational status</p>
               </div>
               <Badge variant="low" className="flex items-center gap-1 px-3 py-1 text-xs">
                 <span className="status-dot status-healthy pulse-dot" /> Operational
@@ -477,35 +506,35 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-3 text-sm">
-              <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                <span className="text-xs font-semibold text-slate-500">Model Architecture</span>
-                <span className="font-bold text-slate-900">{modelStatus.current_model}</span>
+              <div className="flex items-center justify-between py-2 border-b border-[var(--color-border-subtle)]">
+                <span className="text-xs font-semibold text-[var(--color-text-muted)]">Model Architecture</span>
+                <span className="font-bold text-[var(--color-text-main)]">{modelStatus.current_model}</span>
               </div>
-              <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                <span className="text-xs font-semibold text-slate-500">Version</span>
-                <span className="font-mono font-bold text-slate-900">{modelStatus.version}</span>
+              <div className="flex items-center justify-between py-2 border-b border-[var(--color-border-subtle)]">
+                <span className="text-xs font-semibold text-[var(--color-text-muted)]">Version</span>
+                <span className="font-mono font-bold text-[var(--color-text-main)]">{modelStatus.version}</span>
               </div>
-              <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                <span className="text-xs font-semibold text-slate-500">Evaluation Status</span>
-                <span className="text-xs font-medium text-slate-400 italic">Not Evaluated</span>
+              <div className="flex items-center justify-between py-2 border-b border-[var(--color-border-subtle)]">
+                <span className="text-xs font-semibold text-[var(--color-text-muted)]">Evaluation Status</span>
+                <span className="text-xs font-medium text-[var(--color-text-muted)] italic">Not Evaluated</span>
               </div>
-              <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                <span className="text-xs font-semibold text-slate-500">Detection Mode</span>
-                <span className="font-semibold text-slate-900">{modelStatus.detection_mode}</span>
+              <div className="flex items-center justify-between py-2 border-b border-[var(--color-border-subtle)]">
+                <span className="text-xs font-semibold text-[var(--color-text-muted)]">Detection Mode</span>
+                <span className="font-semibold text-[var(--color-text-main)]">{modelStatus.detection_mode}</span>
               </div>
               <div className="flex items-center justify-between py-2">
-                <span className="text-xs font-semibold text-slate-500">Inference Service</span>
+                <span className="text-xs font-semibold text-[var(--color-text-muted)]">Inference Service</span>
                 <div className="flex items-center gap-2">
                   <span className="status-dot status-healthy" />
-                  <span className="font-bold text-xs text-emerald-700 capitalize">{modelStatus.health}</span>
+                  <span className="font-bold text-xs text-emerald-500 capitalize">{modelStatus.health}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+          <div className="mt-4 pt-3 border-t border-[var(--color-border-subtle)] flex items-center justify-between text-xs text-[var(--color-text-muted)]">
             <span>Baseline Supervised Classifier</span>
-            <button onClick={() => navigate('/models')} className="font-bold text-[#B45309] hover:underline cursor-pointer">
+            <button onClick={() => navigate('/models')} className="font-bold text-amber-500 hover:underline cursor-pointer">
               Models & Metrics →
             </button>
           </div>

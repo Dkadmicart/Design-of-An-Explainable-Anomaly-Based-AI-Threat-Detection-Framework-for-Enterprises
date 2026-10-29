@@ -222,12 +222,12 @@ export default function LiveMonitorPage() {
       </div>
 
       {/* Real-time Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card p-6>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
+        <Card p-6 className="min-w-0 overflow-hidden">
           <div className="flex items-center justify-between mb-4">
             <h3 className="card-title">Throughput: Events / sec</h3>
           </div>
-          <div className="h-[150px] w-full">
+          <div className="h-[150px] w-full min-w-0 overflow-hidden">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={metrics}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
@@ -239,11 +239,11 @@ export default function LiveMonitorPage() {
           </div>
         </Card>
 
-        <Card p-6>
+        <Card p-6 className="min-w-0 overflow-hidden">
           <div className="flex items-center justify-between mb-4">
             <h3 className="card-title">Threat Detections: Threats / min</h3>
           </div>
-          <div className="h-[150px] w-full">
+          <div className="h-[150px] w-full min-w-0 overflow-hidden">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={metrics}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />

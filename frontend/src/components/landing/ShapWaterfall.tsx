@@ -25,17 +25,17 @@ export const ShapWaterfall: React.FC<ShapWaterfallProps> = ({
   const isLight = theme === 'light';
 
   return (
-    <div className={`space-y-6 font-sans ${className}`}>
-      {/* Header bar with Anomaly Risk Gauge (Centered) */}
-      <div className={`flex flex-wrap items-center justify-center gap-4 sm:gap-8 pb-4 border-b text-center ${isLight ? 'border-slate-200' : 'border-slate-800'}`}>
-        <span className={`font-mono text-xs font-bold flex items-center justify-center gap-2.5 ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>
-          <span className="w-2.5 h-2.5 rounded-full bg-[#F5B700] animate-pulse" />
+    <div className={`space-y-4 font-sans ${className}`}>
+      {/* Header bar with Anomaly Risk Gauge */}
+      <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-slate-200' : 'border-slate-800'}`}>
+        <span className={`font-mono text-xs font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>
+          <span className="w-2 h-2 rounded-full bg-[#F5B700] animate-pulse" />
           TreeSHAP Attribution Vector
         </span>
-        <div className="flex items-center justify-center gap-2.5 font-mono text-xs">
-          <span className={isLight ? 'text-slate-500 font-semibold' : 'text-slate-400'}>P(Anomaly):</span>
+        <div className="flex items-center gap-2 font-mono text-xs">
+          <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>P(Anomaly):</span>
           <span
-            className={`font-black text-sm px-2.5 py-0.5 rounded-full border ${
+            className={`font-black text-xs px-2.5 py-0.5 rounded-full border ${
               anomalyScore > 0.8
                 ? isLight ? 'bg-red-50 text-red-700 border-red-300' : 'bg-red-950/80 text-red-300 border-red-800'
                 : anomalyScore > 0.4
@@ -48,24 +48,24 @@ export const ShapWaterfall: React.FC<ShapWaterfallProps> = ({
         </div>
       </div>
 
-      {/* Feature Contributions List — Spacious dedicated feature panels */}
-      <div className="space-y-4">
-        {features.map((feat, idx) => {
+      {/* Feature Contributions List — Clean, elegant attribution bars */}
+      <div className="space-y-2.5">
+        {features.slice(0, 4).map((feat, idx) => {
           const isMaliciousPush = feat.shapVal >= 0;
           return (
             <div
               key={idx}
-              className={`p-3.5 sm:p-4 rounded-xl border space-y-2.5 transition-all ${
-                isLight ? 'bg-slate-50/70 border-slate-200' : 'bg-slate-900/60 border-slate-800'
+              className={`p-2.5 sm:p-3 rounded-xl transition-all ${
+                isLight ? 'bg-slate-100/70 border border-slate-200/80' : 'bg-slate-900/60 border border-slate-800/80'
               }`}
             >
-              {/* Row 1: Label and Score */}
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className={`font-bold tracking-tight text-sm truncate ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>
+              {/* Row 1: Label, Raw Value, and Shapley Score */}
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`font-bold tracking-tight text-xs sm:text-sm truncate ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>
                     {feat.label}
                   </span>
-                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex-shrink-0 ${
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border flex-shrink-0 ${
                     isLight 
                       ? 'bg-white text-slate-700 border-slate-300 font-semibold' 
                       : 'bg-slate-800 text-slate-300 border-slate-700'
@@ -74,7 +74,7 @@ export const ShapWaterfall: React.FC<ShapWaterfallProps> = ({
                   </span>
                 </div>
                 <div
-                  className={`font-mono text-sm font-black flex-shrink-0 ml-3 ${
+                  className={`font-mono text-xs font-black flex-shrink-0 ml-2 ${
                     isMaliciousPush
                       ? isLight ? 'text-amber-700' : 'text-amber-400'
                       : isLight ? 'text-cyan-700' : 'text-cyan-400'
@@ -84,21 +84,9 @@ export const ShapWaterfall: React.FC<ShapWaterfallProps> = ({
                 </div>
               </div>
 
-              {/* Row 2: Sub-telemetry key */}
-              <div className="flex items-center justify-between text-[11px] font-mono">
-                <span className={isLight ? 'text-slate-600' : 'text-slate-400'}>
-                  key: <strong className={isLight ? 'text-slate-800' : 'text-slate-300'}>{feat.name}</strong>
-                </span>
-                <span className={isLight ? 'text-slate-600 font-semibold' : 'text-slate-400'}>
-                  Weight: {feat.percentage}%
-                </span>
-              </div>
-
-              {/* Row 3: Progress Bar with smooth rounded edges */}
-              <div className={`h-2.5 w-full rounded-full overflow-hidden p-0.5 border ${
-                isLight 
-                  ? 'bg-slate-200 border-slate-300' 
-                  : 'bg-slate-950 border-slate-800'
+              {/* Row 2: Progress Bar */}
+              <div className={`h-1.5 w-full rounded-full overflow-hidden ${
+                isLight ? 'bg-slate-200' : 'bg-slate-950'
               }`}>
                 <div
                   className={`h-full rounded-full transition-all duration-700 ease-out ${
@@ -115,17 +103,17 @@ export const ShapWaterfall: React.FC<ShapWaterfallProps> = ({
       </div>
 
       {/* Footer Legend */}
-      <div className={`pt-3 border-t flex flex-wrap items-center justify-between gap-3 text-xs font-mono ${
+      <div className={`pt-2.5 border-t flex flex-wrap items-center justify-between gap-3 text-xs font-mono ${
         isLight ? 'border-slate-200 text-slate-700' : 'border-slate-800 text-slate-400'
       }`}>
-        <span className="flex items-center gap-1.5 font-bold">
-          <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" /> +Risk Driver
+        <span className="flex items-center gap-1.5 font-bold text-[11px]">
+          <span className="w-2 h-2 rounded-sm bg-amber-500 inline-block" /> +Risk Driver
         </span>
-        <span className="flex items-center gap-1.5 font-bold">
-          <span className="w-2.5 h-2.5 rounded-sm bg-cyan-500 inline-block" /> -Benign Baseline
+        <span className="flex items-center gap-1.5 font-bold text-[11px]">
+          <span className="w-2 h-2 rounded-sm bg-cyan-500 inline-block" /> -Benign Baseline
         </span>
-        <span className={isLight ? 'text-slate-500 italic text-[11px]' : 'text-slate-500 italic text-[11px]'}>
-          TreeSHAP Exact Decomposition
+        <span className={`italic text-[10px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+          TreeSHAP Exact
         </span>
       </div>
     </div>

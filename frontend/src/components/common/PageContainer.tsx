@@ -10,7 +10,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, actions, statusBadge }: PageHeaderProps) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-slate-200/80 mb-6 lg:mb-8 min-w-0">
+    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-5 border-b border-[var(--color-border-base)] mb-6 lg:mb-8 min-w-0">
       <div className="space-y-1.5 min-w-0 flex-1 pr-4">
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="page-title text-balance">{title}</h1>

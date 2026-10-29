@@ -59,7 +59,7 @@ export default function AlertsPage() {
       />
 
       {/* Navigation Tabs */}
-      <div className="flex gap-1 border-b border-slate-200 overflow-x-auto">
+      <div className="flex gap-1 border-b border-slate-200 overflow-x-auto min-w-0 max-w-full">
         {(['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const).map((tab) => (
           <button
             key={tab}
@@ -72,9 +72,9 @@ export default function AlertsPage() {
       </div>
 
       {/* Filters Bar */}
-      <Card padding="compact" className="flex flex-col md:flex-row items-center justify-between gap-4">
+      <Card padding="compact" className="flex flex-col md:flex-row items-center justify-between gap-4 min-w-0">
         {/* Search Input */}
-        <div className="relative flex-1 w-full">
+        <div className="relative flex-1 w-full min-w-0">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -86,7 +86,7 @@ export default function AlertsPage() {
         </div>
 
         {/* Dropdowns */}
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex items-center gap-3 w-full md:w-auto flex-wrap sm:flex-nowrap min-w-0">
           <div className="flex items-center gap-1.5 min-w-[150px]">
             <Filter size={15} className="text-slate-500" />
             <select
@@ -116,7 +116,7 @@ export default function AlertsPage() {
       </Card>
 
       {/* Alerts Table Card */}
-      <Card p-6>
+      <Card p-6 className="min-w-0 overflow-hidden">
         <div className="flex items-center justify-between mb-4">
           <span className="text-xs font-bold text-slate-500">
             Showing {filteredAlerts.length} of {alerts.length} total alerts

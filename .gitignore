@@ -25,3 +25,4 @@ dist-ssr/
 Thumbs.db
 .vscode/
 .idea/
+.vite/
