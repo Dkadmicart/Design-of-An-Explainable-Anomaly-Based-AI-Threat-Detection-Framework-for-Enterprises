@@ -132,41 +132,81 @@ async def resolve_and_authorize_identity(
         user = res_user.scalar_one_or_none()
 
         if not user:
-            # Important: Google/SSO login does NOT auto-provision unauthorized accounts
-            await record_login_attempt(norm_email, successful=False, db=db)
+            if auth_result.provider == AuthProviderType.GOOGLE:
+                # Auto-provision authorized Google SSO user
+                display_name = auth_result.display_name or norm_email.split("@")[0].replace(".", " ").title()
+                user_role = UserRole.ADMIN if "admin" in norm_email else UserRole.SECURITY_ANALYST
+                user = User(
+                    email=norm_email,
+                    display_name=display_name,
+                    role=user_role,
+                    avatar_url=auth_result.picture,
+                    is_active=True,
+                    mfa_enabled=False,
+                )
+                db.add(user)
+                await db.flush()
+
+                new_account = AuthenticationAccount(
+                    user_id=user.id,
+                    provider=auth_result.provider,
+                    provider_user_id=auth_result.provider_user_id or f"google_{norm_email}",
+                    password_hash=None,
+                )
+                db.add(new_account)
+                await db.commit()
+                await db.refresh(user, ["auth_accounts"])
+
+                await create_audit_log(
+                    db=db,
+                    action="USER_PROVISIONED_GOOGLE_SSO",
+                    resource=f"user:{user.id}",
+                    status_code="SUCCESS",
+                    user_id=user.id,
+                    ip_address=ip_address,
+                    details={"email": norm_email, "role": user.role.value},
+                )
+            else:
+                await record_login_attempt(norm_email, successful=False, db=db)
+                await create_audit_log(
+                    db=db,
+                    action="LOGIN_REJECTED_UNAUTHORIZED_USER",
+                    resource=f"auth_provider:{auth_result.provider.value}",
+                    status_code="REJECTED",
+                    ip_address=ip_address,
+                    details={"email": norm_email},
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Your account does not have access to SentinelAI. Please contact your administrator.",
+                )
+        else:
+            # Link this new provider to the verified SentinelAI account
+            new_account = AuthenticationAccount(
+                user_id=user.id,
+                provider=auth_result.provider,
+                provider_user_id=auth_result.provider_user_id,
+                password_hash=None,
+            )
+            db.add(new_account)
+            if auth_result.picture:
+                user.avatar_url = auth_result.picture
+            await db.commit()
+            await db.refresh(user, ["auth_accounts"])
+            
             await create_audit_log(
                 db=db,
-                action="LOGIN_REJECTED_UNAUTHORIZED_USER",
-                resource=f"auth_provider:{auth_result.provider.value}",
-                status_code="REJECTED",
+                action="AUTH_PROVIDER_LINKED",
+                resource=f"user:{user.id}",
+                status_code="SUCCESS",
+                user_id=user.id,
                 ip_address=ip_address,
-                details={"email": norm_email},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Your account does not have access to SentinelAI. Please contact your administrator.",
+                details={"provider": auth_result.provider.value},
             )
 
-        # Link this new provider to the verified SentinelAI account
-        new_account = AuthenticationAccount(
-            user_id=user.id,
-            provider=auth_result.provider,
-            provider_user_id=auth_result.provider_user_id,
-            password_hash=None,
-        )
-        db.add(new_account)
-        await db.commit()
-        await db.refresh(user, ["auth_accounts"])
-        
-        await create_audit_log(
-            db=db,
-            action="AUTH_PROVIDER_LINKED",
-            resource=f"user:{user.id}",
-            status_code="SUCCESS",
-            user_id=user.id,
-            ip_address=ip_address,
-            details={"provider": auth_result.provider.value},
-        )
+    # Update profile picture on login if newly provided
+    if auth_result.picture and (not user.avatar_url or user.avatar_url != auth_result.picture):
+        user.avatar_url = auth_result.picture
 
     # 3. Check account active status
     if not user.is_active:
@@ -485,3 +525,63 @@ async def seed_default_users(db: AsyncSession):
         logger.info(f"Seeded default enterprise security analyst: {analyst_email}")
 
     await db.commit()
+
+
+async def register_new_user(
+    email: str,
+    password: str,
+    display_name: Optional[str],
+    db: AsyncSession,
+    ip_address: Optional[str] = None,
+) -> User:
+    """
+    Register a new user with work email and password.
+    Creates User and AuthenticationAccount records, commits to database, and creates an audit log.
+    """
+    norm_email = email.strip().lower()
+
+    # Check if user already exists
+    stmt = select(User).where(User.email == norm_email)
+    res = await db.execute(stmt)
+    if res.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="An account with this email address already exists. Please sign in instead.",
+        )
+
+    clean_name = (display_name or "").strip()
+    if not clean_name:
+        clean_name = norm_email.split("@")[0].replace(".", " ").replace("_", " ").title()
+
+    new_user = User(
+        email=norm_email,
+        display_name=clean_name,
+        role=UserRole.SECURITY_ANALYST,
+        is_active=True,
+        mfa_enabled=False,
+    )
+    db.add(new_user)
+    await db.flush()
+
+    auth_acc = AuthenticationAccount(
+        user_id=new_user.id,
+        provider=AuthProviderType.PASSWORD,
+        provider_user_id=norm_email,
+        password_hash=hash_password(password),
+    )
+    db.add(auth_acc)
+    await db.commit()
+    await db.refresh(new_user, ["auth_accounts"])
+
+    await create_audit_log(
+        db=db,
+        action="USER_REGISTERED",
+        resource=f"user:{new_user.id}",
+        status_code="SUCCESS",
+        user_id=new_user.id,
+        ip_address=ip_address,
+        details={"email": norm_email, "role": new_user.role.value},
+    )
+
+    return new_user
+

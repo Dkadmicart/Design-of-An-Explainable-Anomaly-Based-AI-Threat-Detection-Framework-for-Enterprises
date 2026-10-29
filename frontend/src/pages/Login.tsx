@@ -1,54 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Hexagon, Lock, Mail, AlertCircle, Loader2, ArrowRight, ShieldCheck, Check } from 'lucide-react';
+import {
+  Hexagon,
+  Lock,
+  Mail,
+  AlertCircle,
+  Loader2,
+  ArrowRight,
+  ShieldCheck,
+  Check,
+  Eye,
+  EyeOff,
+  Sun,
+  Moon,
+  ArrowLeft,
+  Zap,
+  UserPlus,
+  ChevronRight,
+  ChevronDown,
+  X,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import GoogleAuthButton from '../components/auth/GoogleAuthButton';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, googleLogin } = useAuth();
+  const { login } = useAuth();
+  const { theme, toggleTheme, isLight } = useTheme();
 
+  // Manual Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [authActionText, setAuthActionText] = useState('Signing in...');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeAccountFill, setActiveAccountFill] = useState<'admin' | 'analyst' | null>(null);
 
   const destination = (location.state as any)?.from?.pathname || '/dashboard';
 
+  // ━━━━ MANUAL FORM SUBMISSION ━━━━
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
 
     setErrorMessage(null);
     setIsLoading(true);
+    setAuthActionText('Authenticating credentials...');
 
     try {
-      await login(email, password);
+      await login(email.trim(), password);
       navigate(destination, { replace: true });
     } catch (err: any) {
-      setErrorMessage(err.message || 'Invalid email or password.');
+      setErrorMessage(err.message || 'Invalid email or password. Please verify your credentials.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleGoogleAuth = async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    try {
-      await googleLogin('mock_google_token_for_verification');
-      navigate(destination, { replace: true });
-    } catch (err: any) {
-      setErrorMessage(
-        err.message || 'Your Google account does not have access to SentinelAI. Please contact your administrator.'
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Auto-Fill Form Fields for Pre-Configured Enterprise Roles
   const fillCredentials = (role: 'admin' | 'analyst') => {
     setActiveAccountFill(role);
     if (role === 'admin') {
@@ -61,60 +73,143 @@ export default function LoginPage() {
     setErrorMessage(null);
   };
 
+  // Immediate 1-Click Test Sign-In for Pre-Configured Enterprise Roles
+  const quickSignIn = async (role: 'admin' | 'analyst') => {
+    if (isLoading) return;
+    setActiveAccountFill(role);
+    setErrorMessage(null);
+    setIsLoading(true);
+
+    const userEmail = role === 'admin' ? 'admin@sentinelai.internal' : 'analyst@sentinelai.internal';
+    const userPass = role === 'admin' ? 'SentinelAdmin2026!' : 'SentinelAnalyst2026!';
+    setEmail(userEmail);
+    setPassword(userPass);
+    setAuthActionText(`Instant login as ${role === 'admin' ? 'Administrator' : 'Analyst'}...`);
+
+    try {
+      await login(userEmail, userPass);
+      navigate(destination, { replace: true });
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to authenticate role.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+
   return (
-    <div className="auth-page-wrapper">
-      <div className="auth-card-container space-y-6">
+    <div
+      data-theme={theme}
+      className="auth-page-wrapper selection:bg-amber-400 selection:text-slate-950"
+    >
+      {/* ━━━━ TOP UTILITY / NAVIGATION BAR ━━━━ */}
+      <header className="w-full max-w-4xl mx-auto flex items-center justify-between pb-6 sm:pb-8 pt-1">
+        {/* Back Link */}
+        <Link
+          to="/"
+          className={`inline-flex items-center gap-2 text-xs font-bold transition-all px-3 py-1.5 rounded-xl border ${
+            isLight
+              ? 'text-slate-600 hover:text-slate-950 bg-white hover:bg-slate-50 border-slate-200'
+              : 'text-slate-400 hover:text-white bg-slate-900/60 hover:bg-slate-800/80 border-slate-800'
+          }`}
+          title="Return to SentinelAI Landing Page"
+        >
+          <ArrowLeft size={14} />
+          <span>Platform Overview</span>
+        </Link>
+
+        {/* Right Status + Theme Switcher */}
+        <div className="flex items-center gap-3">
+          <div
+            className={`hidden sm:flex items-center gap-2 text-[11px] font-mono px-3 py-1.5 rounded-full border ${
+              isLight
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : 'bg-emerald-950/40 text-emerald-400 border-emerald-800/50'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>SOC Operational</span>
+          </div>
+
+          {/* Theme Toggle Button (Available anytime) */}
+          <button
+            onClick={toggleTheme}
+            className={`theme-toggle rounded-full ${isLight ? 'border-slate-300' : 'border-white/20'}`}
+            aria-label="Toggle dark/light theme"
+            title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+          >
+            <div className="theme-toggle-knob rounded-full">
+              {isLight ? (
+                <Moon size={12} className="text-white" />
+              ) : (
+                <Sun size={12} className="text-slate-950" />
+              )}
+            </div>
+          </button>
+        </div>
+      </header>
+
+      {/* ━━━━ MAIN AUTH CONTAINER ━━━━ */}
+      <div className="auth-card-container">
         {/* Brand Header */}
-        <div className="text-center space-y-2.5">
+        <div className="text-center space-y-2 mb-6">
           <div
             className="inline-flex items-center gap-3 cursor-pointer group"
             onClick={() => navigate('/')}
           >
-            <div className="flex items-center justify-center w-11 h-11 bg-[#F5B700] rounded-xl shadow-xs ring-1 ring-amber-400/50 group-hover:scale-105 transition-transform">
+            <div className="flex items-center justify-center w-11 h-11 bg-[#F5B700] rounded-xl shadow-[0_0_20px_rgba(245,183,0,0.35)] ring-1 ring-amber-400/50 group-hover:scale-105 transition-transform">
               <Hexagon size={24} className="text-slate-950" strokeWidth={2.5} />
             </div>
             <div className="flex flex-col text-left">
-              <span className="text-xl font-black text-slate-950 tracking-tight leading-none">
+              <span
+                className={`text-xl font-black tracking-tight leading-none ${
+                  isLight ? 'text-slate-950' : 'text-white'
+                }`}
+              >
                 SentinelAI
               </span>
-              <span className="text-[10px] font-extrabold text-amber-700 tracking-widest uppercase mt-1">
-                Enterprise SOC
+              <span className="text-[10px] font-extrabold text-amber-500 tracking-widest uppercase mt-1">
+                Enterprise SOC Portal
               </span>
             </div>
           </div>
 
           <div className="pt-2">
-            <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1">
-              Welcome Back
-            </span>
-            <h1 className="text-2xl font-black text-slate-950 tracking-tight">
-              Sign in to SentinelAI
+            <h1
+              className={`text-2xl font-black tracking-tight ${
+                isLight ? 'text-slate-900' : 'text-slate-100'
+              }`}
+            >
+              Sign In to Your Workspace
             </h1>
-            <p className="text-xs text-slate-500 font-medium mt-1">
-              Secure access to your security operations workspace.
+            <p
+              className={`text-xs font-medium mt-1 ${
+                isLight ? 'text-slate-600' : 'text-slate-400'
+              }`}
+            >
+              Authenticate via company credentials or connect using your active Google identity.
             </p>
           </div>
         </div>
 
-        {/* Main Card */}
+        {/* ━━━━ PRIMARY AUTHENTICATION CARD ━━━━ */}
         <div className="auth-card space-y-5">
-          {/* Error Message */}
+          {/* Error Message Alert */}
           {errorMessage && (
-            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-semibold flex items-start gap-2.5 animate-fade-in">
-              <AlertCircle size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-semibold flex items-start gap-2.5 animate-fade-in">
+              <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1 leading-relaxed">{errorMessage}</div>
             </div>
           )}
 
-          {/* Form */}
+          {/* ── 1. FORM WITH SIGN IN OPTION ON TOP ── */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="auth-field">
-              <label className="auth-label">
-                Work Email
-              </label>
+              <label className="auth-label">Work Email</label>
               <div className="auth-input-wrapper">
                 <span className="auth-input-icon">
-                  <Mail size={17} />
+                  <Mail size={16} />
                 </span>
                 <input
                   type="email"
@@ -133,22 +228,20 @@ export default function LoginPage() {
 
             <div className="auth-field">
               <div className="flex items-center justify-between mb-1">
-                <label className="auth-label mb-0">
-                  Password
-                </label>
+                <label className="auth-label mb-0">Password</label>
                 <Link
                   to="/forgot-password"
-                  className="text-xs font-bold text-amber-700 hover:text-amber-800 transition-colors"
+                  className="text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors"
                 >
                   Forgot password?
                 </Link>
               </div>
               <div className="auth-input-wrapper">
                 <span className="auth-input-icon">
-                  <Lock size={17} />
+                  <Lock size={16} />
                 </span>
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => {
@@ -159,18 +252,29 @@ export default function LoginPage() {
                   disabled={isLoading}
                   className="auth-input"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors cursor-pointer ${
+                    isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
             </div>
 
+            {/* Sign In Primary Action Button */}
             <button
               type="submit"
               disabled={isLoading}
               className="auth-btn-primary"
             >
-              {isLoading ? (
+              {isLoading && !authActionText.includes('Google') ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  <span>Signing in...</span>
+                  <span>{authActionText}</span>
                 </>
               ) : (
                 <>
@@ -181,122 +285,269 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Clean OR Divider */}
-          <div className="relative flex items-center justify-center my-5">
-            <div className="w-full border-t border-slate-200" />
-            <span className="bg-white px-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest absolute">
+          {/* ── 2. EFFECTIVE SPACING WITH "OR" WORD BETWEEN SIGN IN & GOOGLE ── */}
+          <div className="flex items-center gap-4 my-6 sm:my-7">
+            <div
+              className={`flex-1 h-px ${
+                isLight ? 'bg-slate-200' : 'bg-slate-800'
+              }`}
+            />
+            <span
+              className={`text-[11px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${
+                isLight ? 'bg-slate-100 text-slate-500' : 'bg-slate-900 text-slate-400'
+              }`}
+            >
               OR
             </span>
+            <div
+              className={`flex-1 h-px ${
+                isLight ? 'bg-slate-200' : 'bg-slate-800'
+              }`}
+            />
           </div>
 
-          {/* Google OAuth Button */}
+          {/* ── 3. OFFICIAL GOOGLE IDENTITY SSO ── */}
           <div>
-            <button
-              type="button"
-              onClick={handleGoogleAuth}
-              disabled={isLoading}
-              className="auth-btn-google"
+            <GoogleAuthButton
+              buttonText="signin_with"
+              onError={(err) => setErrorMessage(err)}
+            />
+          </div>
+
+          {/* New Account / Sign Up Link */}
+          <div className="pt-2 text-center text-xs">
+            <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>
+              Don't have an enterprise account?{' '}
+            </span>
+            <Link
+              to="/signup"
+              className="font-bold text-amber-500 hover:text-amber-400 transition-colors"
             >
-              <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                />
-              </svg>
-              <span>Continue with Google</span>
-            </button>
+              Sign up here
+            </Link>
           </div>
 
           {/* Access Policy Note */}
-          <div className="pt-3 text-center border-t border-slate-100">
-            <p className="text-xs text-slate-500 font-medium">
-              Need access?{' '}
-              <span className="font-bold text-slate-900">
-                Contact your administrator.
-              </span>
-            </p>
+          <div
+            className={`pt-3 text-center border-t text-xs font-medium ${
+              isLight
+                ? 'border-slate-100 text-slate-500'
+                : 'border-slate-800/80 text-slate-400'
+            }`}
+          >
+            Need access to SentinelAI?{' '}
+            <span
+              className={`font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'}`}
+            >
+              Contact your SecOps Administrator.
+            </span>
           </div>
         </div>
 
-        {/* Enterprise Test Roles Card */}
-        <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200/90 shadow-2xs space-y-3">
-          <div className="flex items-center gap-2 text-amber-900 font-extrabold text-xs">
-            <ShieldCheck size={16} className="text-amber-700" />
-            <span>Pre-Configured Enterprise Roles</span>
+        {/* ━━━━ GENEROUS PHYSICAL SPACING BEFORE PRE-CONFIGURED ENTERPRISE ROLES ━━━━ */}
+        <div className="h-8 sm:h-10 w-full" />
+
+        {/* ━━━━ PRE-CONFIGURED ENTERPRISE ROLES SECTION (CONTENT SEPARATE FROM EACH OTHER) ━━━━ */}
+        <div className="space-y-4">
+          {/* Section Heading */}
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-500">
+                <ShieldCheck size={16} />
+              </div>
+              <div>
+                <h3
+                  className={`text-xs font-black tracking-wide uppercase ${
+                    isLight ? 'text-slate-900' : 'text-slate-100'
+                  }`}
+                >
+                  Pre-Configured Enterprise Roles
+                </h3>
+                <p
+                  className={`text-[11px] font-medium leading-none mt-0.5 ${
+                    isLight ? 'text-slate-600' : 'text-slate-400'
+                  }`}
+                >
+                  Dedicated evaluation test accounts with 1-click immediate access:
+                </p>
+              </div>
+            </div>
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30">
+              EVALUATION
+            </span>
           </div>
-          <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
-            Click an account below to auto-fill credentials for immediate testing:
+
+          {/* ── ROLE 1 CARD: SOC ADMINISTRATOR (STANDALONE CARD) ── */}
+          <div
+            className={`rounded-2xl border p-4 sm:p-5 transition-all shadow-xs ${
+              activeAccountFill === 'admin'
+                ? 'border-amber-500 ring-2 ring-amber-400/30 bg-amber-500/[0.06]'
+                : isLight
+                ? 'bg-white border-amber-200 hover:border-amber-400'
+                : 'bg-slate-900/80 border-slate-800 hover:border-amber-500/40'
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-sm font-black ${
+                      isLight ? 'text-slate-900' : 'text-white'
+                    }`}
+                  >
+                    SOC Administrator
+                  </span>
+                  <span className="text-[9.5px] font-mono font-black px-2 py-0.5 bg-amber-500/20 text-amber-500 rounded border border-amber-500/30">
+                    ADMIN
+                  </span>
+                </div>
+                <div
+                  className={`text-xs font-mono font-semibold ${
+                    isLight ? 'text-slate-700' : 'text-slate-300'
+                  }`}
+                >
+                  admin@sentinelai.internal
+                </div>
+                <div className="text-[11px] text-slate-500 font-medium">
+                  Full Clearance: System Health, ML Model Ops, User Directory &amp; Audit Logs
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2.5 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => quickSignIn('admin')}
+                  disabled={isLoading}
+                  className="py-2 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Zap size={14} />
+                  <span>1-Click Login</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fillCredentials('admin')}
+                  disabled={isLoading}
+                  className={`py-2 px-3.5 rounded-xl border font-bold text-xs transition-all cursor-pointer ${
+                    activeAccountFill === 'admin'
+                      ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'
+                      : isLight
+                      ? 'border-slate-200 text-slate-700 hover:bg-slate-100'
+                      : 'border-slate-700 text-slate-300 hover:bg-slate-800'
+                  }`}
+                  title="Auto-fill form credentials"
+                >
+                  {activeAccountFill === 'admin' ? (
+                    <span className="flex items-center gap-1">
+                      <Check size={13} /> Filled
+                    </span>
+                  ) : (
+                    'Fill Form'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ── DISTINCT BREAK LINE SEPARATING BOTH ROLES ── */}
+          <div className="flex items-center gap-3 my-2 px-2">
+            <div
+              className={`flex-1 h-px ${
+                isLight ? 'bg-amber-200/90' : 'bg-slate-800'
+              }`}
+            />
+            <span
+              className={`text-[9.5px] font-mono font-bold uppercase tracking-widest ${
+                isLight ? 'text-amber-700/70' : 'text-slate-500'
+              }`}
+            >
+              Role Alternative
+            </span>
+            <div
+              className={`flex-1 h-px ${
+                isLight ? 'bg-amber-200/90' : 'bg-slate-800'
+              }`}
+            />
+          </div>
+
+          {/* ── ROLE 2 CARD: SECURITY ANALYST (STANDALONE CARD) ── */}
+          <div
+            className={`rounded-2xl border p-4 sm:p-5 transition-all shadow-xs ${
+              activeAccountFill === 'analyst'
+                ? 'border-cyan-500 ring-2 ring-cyan-400/30 bg-cyan-500/[0.06]'
+                : isLight
+                ? 'bg-white border-slate-200 hover:border-cyan-400'
+                : 'bg-slate-900/80 border-slate-800 hover:border-cyan-500/40'
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-sm font-black ${
+                      isLight ? 'text-slate-900' : 'text-white'
+                    }`}
+                  >
+                    SecOps Security Analyst
+                  </span>
+                  <span className="text-[9.5px] font-mono font-black px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/30">
+                    ANALYST
+                  </span>
+                </div>
+                <div
+                  className={`text-xs font-mono font-semibold ${
+                    isLight ? 'text-slate-700' : 'text-slate-300'
+                  }`}
+                >
+                  analyst@sentinelai.internal
+                </div>
+                <div className="text-[11px] text-slate-500 font-medium">
+                  Tier-2 Clearance: Live Telemetry, Alert Triage &amp; TreeSHAP Explainability
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2.5 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => quickSignIn('analyst')}
+                  disabled={isLoading}
+                  className="py-2 px-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Zap size={14} />
+                  <span>1-Click Login</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fillCredentials('analyst')}
+                  disabled={isLoading}
+                  className={`py-2 px-3.5 rounded-xl border font-bold text-xs transition-all cursor-pointer ${
+                    activeAccountFill === 'analyst'
+                      ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'
+                      : isLight
+                      ? 'border-slate-200 text-slate-700 hover:bg-slate-100'
+                      : 'border-slate-700 text-slate-300 hover:bg-slate-800'
+                  }`}
+                  title="Auto-fill form credentials"
+                >
+                  {activeAccountFill === 'analyst' ? (
+                    <span className="flex items-center gap-1">
+                      <Check size={13} /> Filled
+                    </span>
+                  ) : (
+                    'Fill Form'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer / Security Assurance */}
+        <div className="text-center text-[11px] text-slate-500 pt-8 space-y-1">
+          <p className="font-mono">
+            Argon2id Key Derivation • TLS 1.3 End-to-End • SOC-2 Type II
           </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {/* Admin Role */}
-            <button
-              type="button"
-              onClick={() => fillCredentials('admin')}
-              className={`p-3 rounded-xl border text-left transition-all cursor-pointer shadow-2xs bg-white ${
-                activeAccountFill === 'admin'
-                  ? 'border-amber-500 ring-2 ring-amber-400/30'
-                  : 'border-amber-200/80 hover:border-amber-400'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold text-slate-900">
-                  Administrator
-                </span>
-                <span className="text-[9.5px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-900 rounded">
-                  ADMIN
-                </span>
-              </div>
-              <div className="text-[10.5px] text-slate-500 font-mono mt-1 truncate">
-                admin@sentinelai.internal
-              </div>
-              {activeAccountFill === 'admin' && (
-                <div className="mt-1.5 flex items-center gap-1 text-[10px] font-bold text-emerald-700">
-                  <Check size={12} /> Selected
-                </div>
-              )}
-            </button>
-
-            {/* Analyst Role */}
-            <button
-              type="button"
-              onClick={() => fillCredentials('analyst')}
-              className={`p-3 rounded-xl border text-left transition-all cursor-pointer shadow-2xs bg-white ${
-                activeAccountFill === 'analyst'
-                  ? 'border-amber-500 ring-2 ring-amber-400/30'
-                  : 'border-amber-200/80 hover:border-amber-400'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold text-slate-900">
-                  Security Analyst
-                </span>
-                <span className="text-[9.5px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded">
-                  ANALYST
-                </span>
-              </div>
-              <div className="text-[10.5px] text-slate-500 font-mono mt-1 truncate">
-                analyst@sentinelai.internal
-              </div>
-              {activeAccountFill === 'analyst' && (
-                <div className="mt-1.5 flex items-center gap-1 text-[10px] font-bold text-emerald-700">
-                  <Check size={12} /> Selected
-                </div>
-              )}
-            </button>
-          </div>
         </div>
       </div>
     </div>

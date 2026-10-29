@@ -2,11 +2,12 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, Bell, Menu, PanelLeftClose, PanelLeftOpen,
-  ChevronDown, LogOut, Shield, User as UserIcon, X
+  ChevronDown, LogOut, Shield, User as UserIcon, X, Sun, Moon
 } from 'lucide-react';
 import clsx from 'clsx';
 import type { EnvironmentMode } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 
 interface HeaderProps {
   mode: EnvironmentMode;
@@ -25,6 +26,7 @@ export default function Header({
 }: HeaderProps) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { theme, toggleTheme, isLight } = useTheme();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -58,18 +60,33 @@ export default function Header({
     navigate('/login', { replace: true });
   };
 
-  // Initials generator
-  const getInitials = (name?: string) => {
-    if (!name) return 'SA';
-    const parts = name.trim().split(' ');
+  // Initials generator supporting emails and full names
+  const getInitials = (identifier?: string) => {
+    if (!identifier) return 'ID';
+    if (identifier.includes('@')) {
+      const userPart = identifier.split('@')[0];
+      const clean = userPart.replace(/[._-]/g, ' ').trim();
+      const parts = clean.split(/\s+/);
+      if (parts.length >= 2) {
+        return (parts[0][0] + parts[1][0]).toUpperCase();
+      }
+      return userPart.slice(0, 2).toUpperCase();
+    }
+    const parts = identifier.trim().split(/\s+/);
     if (parts.length >= 2) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
     }
-    return name.slice(0, 2).toUpperCase();
+    return identifier.slice(0, 2).toUpperCase();
   };
 
-  const displayName = user?.display_name || 'SecOps Analyst';
-  const roleLabel = user?.role ? user.role.replace('_', ' ') : 'SOC Tier-2';
+  const userLoginId = user?.email || user?.display_name || 'analyst@sentinelai.internal';
+  const roleLabel = user?.role ? user.role.replace('_', ' ') : 'SECURITY ANALYST';
+  const isGoogleUser = Boolean(
+    user?.auth_providers?.includes('GOOGLE') ||
+    user?.email?.includes('gmail.com') ||
+    user?.email === 'dkadmicrts@gmail.com' ||
+    userLoginId.includes('dkadmicrts')
+  );
 
   return (
     <>
@@ -161,6 +178,22 @@ export default function Header({
             <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
           </button>
 
+          {/* Theme Toggle Button */}
+          <button
+            onClick={toggleTheme}
+            className={`theme-toggle rounded-full ${isLight ? 'border-slate-300' : 'border-white/20'}`}
+            aria-label="Toggle dark/light theme"
+            title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+          >
+            <div className="theme-toggle-knob rounded-full">
+              {isLight ? (
+                <Moon size={12} className="text-white" />
+              ) : (
+                <Sun size={12} className="text-slate-950" />
+              )}
+            </div>
+          </button>
+
           {/* Authenticated User Profile Pill & Dropdown */}
           <div className="relative" ref={dropdownRef}>
             <button
@@ -170,15 +203,52 @@ export default function Header({
               aria-expanded={dropdownOpen}
               aria-label="User profile and settings menu"
             >
-              <div className="w-9 h-9 rounded-xl bg-amber-100/90 border border-amber-300/80 flex items-center justify-center font-black text-xs text-amber-900 shadow-2xs flex-shrink-0">
-                {getInitials(user?.display_name)}
+              <div className="relative flex-shrink-0">
+                {user?.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt={user.display_name || userLoginId}
+                    className="w-9 h-9 rounded-xl object-cover ring-2 ring-blue-400/30 shadow-2xs transition-transform group-hover:scale-105"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div
+                    className={clsx(
+                      'w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shadow-2xs font-mono transition-transform group-hover:scale-105',
+                      isGoogleUser
+                        ? 'bg-gradient-to-tr from-blue-600 to-indigo-600 text-white ring-2 ring-blue-400/30'
+                        : user?.role === 'ADMIN'
+                        ? 'bg-gradient-to-tr from-amber-500 to-amber-600 text-slate-950 ring-2 ring-amber-400/30'
+                        : 'bg-gradient-to-tr from-slate-800 to-slate-900 text-white ring-2 ring-slate-300/30'
+                    )}
+                  >
+                    {getInitials(user?.display_name || userLoginId)}
+                  </div>
+                )}
+                <span
+                  className={clsx(
+                    'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white',
+                    isGoogleUser ? 'bg-blue-500' : 'bg-emerald-500'
+                  )}
+                  title={isGoogleUser ? 'Google Workspace SSO' : 'Active Session'}
+                />
               </div>
-              <div className="hidden lg:flex flex-col text-left">
-                <span className="text-xs font-extrabold text-slate-900 leading-tight">
-                  {displayName}
-                </span>
-                <span className="text-[10px] font-bold text-amber-700 uppercase leading-tight tracking-wider">
-                  {roleLabel}
+              <div className="hidden lg:flex flex-col text-left min-w-0 max-w-[210px]">
+                <div className="flex items-center gap-1.5 truncate">
+                  <span
+                    className="text-xs font-bold text-slate-900 leading-tight truncate"
+                    title={user?.display_name || userLoginId}
+                  >
+                    {user?.display_name || userLoginId}
+                  </span>
+                  {isGoogleUser && (
+                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 bg-blue-50 text-blue-600 border border-blue-200/80 rounded">
+                      GOOGLE
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] font-semibold text-slate-500 uppercase leading-tight tracking-wider truncate mt-0.5 font-mono">
+                  {user?.email || roleLabel}
                 </span>
               </div>
               <ChevronDown
@@ -195,15 +265,17 @@ export default function Header({
               <div className="profile-dropdown-menu animate-fade-in" role="menu">
                 {/* Header info card */}
                 <div className="profile-dropdown-header">
-                  <div className="profile-dropdown-name truncate">
-                    {user?.display_name || 'SecOps Analyst'}
+                  <div className="profile-dropdown-name truncate font-mono text-xs font-black text-slate-900">
+                    {userLoginId}
                   </div>
-                  <div className="profile-dropdown-email">
-                    {user?.email || 'analyst@sentinelai.internal'}
+                  <div className="profile-dropdown-email text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                    {user?.display_name && user.display_name !== userLoginId
+                      ? `Profile: ${user.display_name}`
+                      : 'Authenticated User ID'}
                   </div>
-                  <div className="profile-dropdown-badge">
+                  <div className="profile-dropdown-badge mt-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-600 flex-shrink-0" />
-                    <span>Role: {user?.role || 'ANALYST'}</span>
+                    <span>Role: {roleLabel}</span>
                   </div>
                 </div>
 
@@ -283,9 +355,9 @@ export default function Header({
 
               <div>
                 <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px] block mb-0.5">
-                  Enterprise Email
+                  User Identity / Login ID
                 </span>
-                <span className="font-mono text-slate-700">{user?.email}</span>
+                <span className="font-mono font-bold text-slate-800 text-xs">{userLoginId}</span>
               </div>
 
               <div>

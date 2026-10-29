@@ -13,9 +13,17 @@ class LoginRequest(BaseModel):
     password: str = Field(..., min_length=8)
 
 
+class RegisterRequest(BaseModel):
+    """Email + Password registration request."""
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    display_name: Optional[str] = Field(None, min_length=2, max_length=100)
+
+
 class GoogleLoginRequest(BaseModel):
     """Google OAuth / OIDC login request."""
-    credential: str = Field(..., description="Google ID Token (JWT)")
+    credential: str = Field(..., description="Google ID Token (JWT) or OAuth Access Token")
+    email: Optional[EmailStr] = Field(None, description="Enterprise user email for validation")
 
 
 class TokenResponse(BaseModel):
@@ -34,6 +42,7 @@ class UserResponse(BaseModel):
     is_active: bool
     mfa_enabled: bool
     organization_id: Optional[str] = None
+    avatar_url: Optional[str] = None
     created_at: datetime
     last_login_at: Optional[datetime] = None
     auth_providers: List[str] = []

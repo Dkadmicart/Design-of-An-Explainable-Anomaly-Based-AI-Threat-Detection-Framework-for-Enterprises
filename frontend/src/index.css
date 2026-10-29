@@ -108,7 +108,7 @@ h1, h2, h3, h4, h5, h6, p {
   word-break: normal;
 }
 
-/* ─── Enterprise Auth Layout & Form Utilities ────────────────────────────── */
+/* ─── Enterprise Auth Layout & Form Utilities (Theme Adaptive) ─────────── */
 
 .auth-page-wrapper {
   min-height: 100vh;
@@ -116,44 +116,87 @@ h1, h2, h3, h4, h5, h6, p {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 3rem 1.25rem;
-  background-color: #F8FAFC;
+  justify-content: flex-start;
+  padding: 1.5rem 1rem 3rem;
+  background-color: var(--landing-bg, #020617);
+  color: var(--landing-text, #F1F5F9);
+  transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s ease;
+  position: relative;
+  overflow-y: auto;
+}
+
+[data-theme="light"] .auth-page-wrapper,
+.light .auth-page-wrapper {
+  --auth-bg-gradient: radial-gradient(circle at 50% 0%, rgba(245, 183, 0, 0.08) 0%, transparent 60%);
+  --auth-card-bg: #FFFFFF;
+  --auth-card-border: #E2E8F0;
+  --auth-card-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --auth-input-bg: #F8FAFC;
+  --auth-input-border: #CBD5E1;
+  --auth-input-text: #0F172A;
+  --auth-label: #475569;
+  --auth-divider: #E2E8F0;
+  --auth-roles-bg: #FFFBEB;
+  --auth-roles-border: #FDE68A;
+  --auth-role-card-bg: #FFFFFF;
+  --auth-role-card-border: #E2E8F0;
+  --auth-role-card-hover: #F8FAFC;
+}
+
+[data-theme="dark"] .auth-page-wrapper,
+.dark .auth-page-wrapper,
+.auth-page-wrapper {
+  --auth-bg-gradient: radial-gradient(circle at 50% 0%, rgba(245, 183, 0, 0.12) 0%, transparent 70%);
+  --auth-card-bg: rgba(15, 23, 42, 0.85);
+  --auth-card-border: rgba(255, 255, 255, 0.08);
+  --auth-card-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 25px rgba(245, 183, 0, 0.05);
+  --auth-input-bg: rgba(2, 6, 23, 0.75);
+  --auth-input-border: rgba(255, 255, 255, 0.14);
+  --auth-input-text: #F8FAFC;
+  --auth-label: #94A3B8;
+  --auth-divider: rgba(255, 255, 255, 0.1);
+  --auth-roles-bg: rgba(245, 183, 0, 0.04);
+  --auth-roles-border: rgba(245, 183, 0, 0.18);
+  --auth-role-card-bg: rgba(15, 23, 42, 0.65);
+  --auth-role-card-border: rgba(255, 255, 255, 0.09);
+  --auth-role-card-hover: rgba(30, 41, 59, 0.8);
 }
 
 .auth-card-container {
   width: 100%;
-  max-width: 460px;
+  max-width: 480px;
   margin: 0 auto;
 }
 
 .auth-card {
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
+  background: var(--auth-card-bg);
+  border: 1px solid var(--auth-card-border);
   border-radius: 20px;
-  padding: 2.25rem 2rem;
-  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 8px -1px rgba(15, 23, 42, 0.04);
+  padding: 1.75rem 1.5rem;
+  box-shadow: var(--auth-card-shadow);
+  backdrop-filter: blur(16px);
+  transition: all 0.25s ease;
 }
 
 @media (min-width: 640px) {
   .auth-card {
-    padding: 2.5rem 2.25rem;
+    padding: 2.25rem 2rem;
   }
 }
 
 .auth-field {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 1.125rem;
+  gap: 0.375rem;
+  margin-bottom: 1rem;
 }
 
 .auth-label {
-  font-size: 0.75rem; /* 12px */
+  font-size: 0.725rem;
   font-weight: 700;
-  color: #334155;
+  color: var(--auth-label);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }
 
 .auth-input-wrapper {
@@ -165,29 +208,28 @@ h1, h2, h3, h4, h5, h6, p {
 
 .auth-input {
   width: 100% !important;
-  height: 48px !important;
-  padding-left: 3.125rem !important; /* 50px - guaranteed clear of icon */
-  padding-right: 1rem !important;
-  font-size: 0.875rem !important; /* 14px */
+  height: 46px !important;
+  padding-left: 3rem !important;
+  padding-right: 2.75rem !important;
+  font-size: 0.875rem !important;
   font-family: var(--font-sans) !important;
   font-weight: 500 !important;
-  color: #0F172A !important;
-  background-color: #F8FAFC !important;
-  border: 1px solid #CBD5E1 !important;
+  color: var(--auth-input-text) !important;
+  background-color: var(--auth-input-bg) !important;
+  border: 1px solid var(--auth-input-border) !important;
   border-radius: 12px !important;
   outline: none !important;
   transition: all 150ms ease !important;
 }
 
 .auth-input:focus {
-  background-color: #FFFFFF !important;
   border-color: #F5B700 !important;
-  box-shadow: 0 0 0 3.5px rgba(245, 183, 0, 0.22) !important;
+  box-shadow: 0 0 0 3px rgba(245, 183, 0, 0.25) !important;
 }
 
 .auth-input-icon {
   position: absolute;
-  left: 1.125rem; /* 18px */
+  left: 1.125rem;
   top: 50%;
   transform: translateY(-50%);
   color: #94A3B8;
@@ -212,44 +254,57 @@ h1, h2, h3, h4, h5, h6, p {
   border-radius: 12px;
   border: 1px solid #D9A300;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  transition: all 150ms ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0 16px rgba(245, 183, 0, 0.2);
+  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
 }
 
 .auth-btn-primary:hover:not(:disabled) {
-  background-color: #E0A800;
-  box-shadow: 0 2px 6px rgba(245, 183, 0, 0.3);
+  background-color: #FACC15;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(245, 183, 0, 0.35);
+}
+
+.auth-btn-primary:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .auth-btn-primary:disabled {
-  background-color: #FDE68A;
+  background-color: #CBD5E1;
+  color: #64748B;
+  border-color: transparent;
   cursor: not-allowed;
-  opacity: 0.7;
+  opacity: 0.6;
+  box-shadow: none;
 }
 
 .auth-btn-google {
   width: 100%;
-  height: 48px;
+  height: 46px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
-  background-color: #FFFFFF;
-  color: #1E293B;
+  background-color: var(--auth-card-bg);
+  color: var(--auth-input-text);
   font-weight: 700;
   font-size: 0.875rem;
   border-radius: 12px;
-  border: 1px solid #CBD5E1;
+  border: 1px solid var(--auth-input-border);
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  transition: all 150ms ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
 }
 
 .auth-btn-google:hover:not(:disabled) {
-  background-color: #F8FAFC;
-  border-color: #94A3B8;
+  background-color: var(--auth-role-card-hover);
+  border-color: rgba(245, 183, 0, 0.4);
+  transform: translateY(-1px);
+}
+
+.auth-btn-google:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 /* ─── Global Enterprise Spacing & Landing Layout Tokens ─────────────────── */

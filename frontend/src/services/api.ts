@@ -72,10 +72,19 @@ export const api = {
       return data;
     },
 
-    googleLogin: async (credential: string): Promise<AuthResponse> => {
+    register: async (email: string, password: string, display_name?: string): Promise<AuthResponse> => {
+      const data = await fetchJson<AuthResponse>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ email, password, ...(display_name ? { display_name } : {}) }),
+      });
+      setStoredToken(data.access_token);
+      return data;
+    },
+
+    googleLogin: async (credential: string, email?: string): Promise<AuthResponse> => {
       const data = await fetchJson<AuthResponse>('/auth/google', {
         method: 'POST',
-        body: JSON.stringify({ credential }),
+        body: JSON.stringify({ credential, ...(email ? { email } : {}) }),
       });
       setStoredToken(data.access_token);
       return data;

@@ -8,6 +8,7 @@ export interface User {
   is_active: boolean;
   mfa_enabled: boolean;
   organization_id?: string | null;
+  avatar_url?: string | null;
   created_at: string;
   last_login_at?: string | null;
   auth_providers: string[];

@@ -8,7 +8,8 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<AuthResponse>;
-  googleLogin: (credential: string) => Promise<AuthResponse>;
+  register: (email: string, password: string, display_name?: string) => Promise<AuthResponse>;
+  googleLogin: (credential: string, email?: string) => Promise<AuthResponse>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -59,10 +60,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const googleLogin = async (credential: string): Promise<AuthResponse> => {
+  const register = async (email: string, password: string, display_name?: string): Promise<AuthResponse> => {
     setIsLoading(true);
     try {
-      const resp = await api.auth.googleLogin(credential);
+      const resp = await api.auth.register(email, password, display_name);
+      setToken(resp.access_token);
+      setUser(resp.user);
+      return resp;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const googleLogin = async (credential: string, email?: string): Promise<AuthResponse> => {
+    setIsLoading(true);
+    try {
+      const resp = await api.auth.googleLogin(credential, email);
       setToken(resp.access_token);
       setUser(resp.user);
       return resp;
@@ -101,6 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         isAuthenticated: !!user && !!token,
         login,
+        register,
         googleLogin,
         logout,
         refreshUser,

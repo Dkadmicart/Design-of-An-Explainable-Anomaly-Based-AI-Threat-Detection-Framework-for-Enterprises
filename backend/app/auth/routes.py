@@ -14,7 +14,7 @@ from app.models.database import (
     User, AuthenticationAccount, AuditLog, UserRole, AuthProviderType
 )
 from app.auth.schemas import (
-    LoginRequest, GoogleLoginRequest, AuthResponse, UserResponse,
+    LoginRequest, RegisterRequest, GoogleLoginRequest, AuthResponse, UserResponse,
     TokenResponse, UserInviteRequest, UpdateRoleRequest, UpdateStatusRequest,
     ForgotPasswordRequest, ResetPasswordRequest, AuditLogResponse
 )
@@ -24,7 +24,7 @@ from app.auth.service import (
     check_rate_limit, record_login_attempt, resolve_and_authorize_identity,
     create_user_session, refresh_user_session, invalidate_session,
     invalidate_all_user_sessions, request_password_reset, complete_password_reset,
-    create_audit_log
+    create_audit_log, register_new_user
 )
 from app.auth.security import hash_password
 from app.auth.dependencies import get_current_user, require_admin
@@ -53,6 +53,7 @@ def _format_user_response(user: User) -> UserResponse:
         is_active=user.is_active,
         mfa_enabled=user.mfa_enabled,
         organization_id=user.organization_id,
+        avatar_url=getattr(user, "avatar_url", None),
         created_at=user.created_at,
         last_login_at=user.last_login_at,
         auth_providers=providers,
@@ -130,6 +131,42 @@ async def login(
     )
 
     # Set secure cookies
+    _set_auth_cookies(response, access_token, refresh_token)
+
+    return AuthResponse(
+        access_token=access_token,
+        token_type="bearer",
+        expires_in=expires_in,
+        user=_format_user_response(user),
+    )
+
+
+@router.post("/register", response_model=AuthResponse)
+async def register(
+    credentials: RegisterRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Register a new user account with work email and password.
+    Creates user record, establishes session, sets secure cookies, and logs in immediately.
+    """
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+
+    user = await register_new_user(
+        email=credentials.email,
+        password=credentials.password,
+        display_name=credentials.display_name,
+        db=db,
+        ip_address=client_ip,
+    )
+
+    access_token, refresh_token, expires_in = await create_user_session(
+        user, db, ip_address=client_ip, user_agent=user_agent
+    )
+
     _set_auth_cookies(response, access_token, refresh_token)
 
     return AuthResponse(

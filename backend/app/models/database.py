@@ -331,6 +331,7 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     mfa_enabled = Column(Boolean, default=False, nullable=False)
     organization_id = Column(String(36), nullable=True)  # Prepared for enterprise multi-tenancy
+    avatar_url = Column(String(500), nullable=True)  # Profile picture URL from OAuth provider (e.g. Google)
     
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

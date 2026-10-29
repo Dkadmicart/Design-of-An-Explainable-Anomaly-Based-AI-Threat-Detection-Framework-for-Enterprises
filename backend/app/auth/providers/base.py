@@ -17,6 +17,7 @@ class AuthResult:
     provider_user_id: str
     email: str
     display_name: Optional[str] = None
+    picture: Optional[str] = None
     error_message: Optional[str] = None
     raw_claims: Optional[Dict[str, Any]] = None
 

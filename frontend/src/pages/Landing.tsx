@@ -9,6 +9,7 @@ import {
   Sun, Moon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { Button } from '../components/common/Button';
 import { ThreatCanvas } from '../components/landing/ThreatCanvas';
 import { ThreatRadar } from '../components/landing/ThreatRadar';
@@ -107,11 +108,10 @@ type Theme = 'dark' | 'light';
 export default function LandingPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const { theme, toggleTheme, isLight } = useTheme();
   const [activeKey, setActiveKey] = useState<'ddos' | 'scan' | 'sqli' | 'normal'>('ddos');
   const [packetCounter, setPacketCounter] = useState(1489240);
-  const [theme, setTheme] = useState<Theme>('dark');
 
-  const isLight = theme === 'light';
   const scenario = SCENARIOS[activeKey];
   const goTo = useCallback((path: string) => navigate(isAuthenticated ? path : '/login'), [navigate, isAuthenticated]);
 
@@ -122,8 +122,6 @@ export default function LandingPage() {
     }, 1200);
     return () => clearInterval(timer);
   }, []);
-
-  const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
 
   // Theme-aware tokens with high contrast
   const bgMain = isLight ? 'bg-[#F8FAFC]' : 'bg-[#020617]';
