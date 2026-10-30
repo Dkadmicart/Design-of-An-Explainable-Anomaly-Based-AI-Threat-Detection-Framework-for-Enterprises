@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Hexagon, Lock, Mail, AlertCircle, Loader2, ArrowRight, ShieldCheck, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { DEMO_CREDENTIALS, validateWorkEmail, selectDemoCredentials } from '../services/authUtils';
+
+export { DEMO_CREDENTIALS };
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -21,10 +24,17 @@ export default function LoginPage() {
     if (isLoading) return;
 
     setErrorMessage(null);
+
+    const validation = validateWorkEmail(email);
+    if (!validation.isValid) {
+      setErrorMessage(validation.error || 'Please enter a valid work email address.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      await login(validation.normalized, password);
       navigate(destination, { replace: true });
     } catch (err: any) {
       setErrorMessage(err.message || 'Invalid email or password.');
@@ -51,13 +61,16 @@ export default function LoginPage() {
 
   const fillCredentials = (role: 'admin' | 'analyst') => {
     setActiveAccountFill(role);
-    if (role === 'admin') {
-      setEmail('admin@sentinelai.internal');
-      setPassword('SentinelAdmin2026!');
-    } else {
-      setEmail('analyst@sentinelai.internal');
-      setPassword('SentinelAnalyst2026!');
-    }
+    const creds = selectDemoCredentials(role);
+    setEmail(creds.email);
+    setPassword(creds.password);
+    setErrorMessage(null);
+  };
+
+  const clearForm = () => {
+    setEmail('');
+    setPassword('');
+    setActiveAccountFill(null);
     setErrorMessage(null);
   };
 
@@ -100,7 +113,7 @@ export default function LoginPage() {
         <div className="auth-card space-y-5">
           {/* Error Message */}
           {errorMessage && (
-            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-semibold flex items-start gap-2.5 animate-fade-in">
+            <div data-testid="login-error-message" className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-semibold flex items-start gap-2.5 animate-fade-in">
               <AlertCircle size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1 leading-relaxed">{errorMessage}</div>
             </div>
@@ -109,7 +122,7 @@ export default function LoginPage() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="auth-field">
-              <label className="auth-label">
+              <label className="auth-label" htmlFor="work-email">
                 Work Email
               </label>
               <div className="auth-input-wrapper">
@@ -117,7 +130,10 @@ export default function LoginPage() {
                   <Mail size={17} />
                 </span>
                 <input
+                  id="work-email"
+                  name="email"
                   type="email"
+                  autoComplete="username"
                   required
                   value={email}
                   onChange={(e) => {
@@ -127,13 +143,14 @@ export default function LoginPage() {
                   placeholder="analyst@sentinelai.internal"
                   disabled={isLoading}
                   className="auth-input"
+                  data-testid="login-email-input"
                 />
               </div>
             </div>
 
             <div className="auth-field">
               <div className="flex items-center justify-between mb-1">
-                <label className="auth-label mb-0">
+                <label className="auth-label mb-0" htmlFor="work-password">
                   Password
                 </label>
                 <Link
@@ -148,7 +165,10 @@ export default function LoginPage() {
                   <Lock size={17} />
                 </span>
                 <input
+                  id="work-password"
+                  name="password"
                   type="password"
+                  autoComplete="current-password"
                   required
                   value={password}
                   onChange={(e) => {
@@ -158,6 +178,7 @@ export default function LoginPage() {
                   placeholder="••••••••••••"
                   disabled={isLoading}
                   className="auth-input"
+                  data-testid="login-password-input"
                 />
               </div>
             </div>
@@ -166,6 +187,7 @@ export default function LoginPage() {
               type="submit"
               disabled={isLoading}
               className="auth-btn-primary"
+              data-testid="login-submit-btn"
             >
               {isLoading ? (
                 <>
@@ -232,9 +254,21 @@ export default function LoginPage() {
 
         {/* Enterprise Test Roles Card */}
         <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200/90 shadow-2xs space-y-3">
-          <div className="flex items-center gap-2 text-amber-900 font-extrabold text-xs">
-            <ShieldCheck size={16} className="text-amber-700" />
-            <span>Pre-Configured Enterprise Roles</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-amber-900 font-extrabold text-xs">
+              <ShieldCheck size={16} className="text-amber-700" />
+              <span>Pre-Configured Enterprise Roles</span>
+            </div>
+            {(email || password) && (
+              <button
+                type="button"
+                onClick={clearForm}
+                className="text-[10px] font-bold text-amber-800 hover:text-amber-950 underline cursor-pointer"
+                data-testid="login-clear-btn"
+              >
+                Clear fields
+              </button>
+            )}
           </div>
           <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
             Click an account below to auto-fill credentials for immediate testing:
@@ -244,6 +278,7 @@ export default function LoginPage() {
             {/* Admin Role */}
             <button
               type="button"
+              data-testid="demo-admin-btn"
               onClick={() => fillCredentials('admin')}
               className={`p-3 rounded-xl border text-left transition-all cursor-pointer shadow-2xs bg-white ${
                 activeAccountFill === 'admin'
@@ -272,6 +307,7 @@ export default function LoginPage() {
             {/* Analyst Role */}
             <button
               type="button"
+              data-testid="demo-analyst-btn"
               onClick={() => fillCredentials('analyst')}
               className={`p-3 rounded-xl border text-left transition-all cursor-pointer shadow-2xs bg-white ${
                 activeAccountFill === 'analyst'

@@ -3,7 +3,7 @@ SentinelAI - SQLAlchemy ORM Models
 Database schema for the threat detection platform.
 """
 from sqlalchemy import (
-    Column, String, Integer, Float, Boolean, DateTime, Text, JSON,
+    Column, String, Integer, BigInteger, Float, Boolean, DateTime, Text, JSON,
     ForeignKey, Index, Enum as SAEnum
 )
 from sqlalchemy.orm import DeclarativeBase, relationship, Mapped, mapped_column
@@ -49,6 +49,23 @@ class DatasetRunStatus(str, enum.Enum):
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
+
+
+class DatasetStatus(str, enum.Enum):
+    DISCOVERED = "DISCOVERED"
+    VALIDATING = "VALIDATING"
+    READY = "READY"
+    PROCESSING = "PROCESSING"
+    PROCESSED = "PROCESSED"
+    ERROR = "ERROR"
+    NOT_AVAILABLE = "NOT_AVAILABLE"
+
+
+class DatasetFileStatus(str, enum.Enum):
+    VALID = "VALID"
+    INVALID = "INVALID"
+    NOT_FOUND = "NOT_FOUND"
+    PROCESSING = "PROCESSING"
 
 
 class AttackType(str, enum.Enum):
@@ -316,6 +333,80 @@ class DatasetRun(Base):
     processing_notes = Column(JSON, nullable=True)
     
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class DatasetRegistry(Base):
+    """Registered benchmark or historical dataset."""
+    __tablename__ = "dataset_registry"
+
+    id = Column(String(50), primary_key=True)  # e.g., "cic-ids2017"
+    name = Column(String(100), nullable=False)
+    version = Column(String(50), default="1.0.0")
+    source = Column(String(200), default="Canadian Institute for Cybersecurity (UNB)")
+    description = Column(Text, nullable=True)
+    status = Column(SAEnum(DatasetStatus), default=DatasetStatus.NOT_AVAILABLE, nullable=False, index=True)
+    
+    file_count = Column(Integer, default=0)
+    total_records = Column(BigInteger, default=0)
+    feature_count = Column(Integer, default=0)
+    label_column = Column(String(100), nullable=True)
+    
+    schema_metadata = Column(JSON, nullable=True)
+    quality_summary = Column(JSON, nullable=True)
+    label_distribution = Column(JSON, nullable=True)
+    feature_statistics = Column(JSON, nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    files = relationship("DatasetFileRecord", back_populates="dataset", cascade="all, delete-orphan")
+    runs = relationship("DatasetProcessingRun", back_populates="dataset", cascade="all, delete-orphan")
+
+
+class DatasetFileRecord(Base):
+    """File record within a dataset."""
+    __tablename__ = "dataset_files"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    dataset_id = Column(String(50), ForeignKey("dataset_registry.id", ondelete="CASCADE"), nullable=False, index=True)
+    filename = Column(String(200), nullable=False, index=True)
+    file_path = Column(String(500), nullable=True)
+    size_bytes = Column(BigInteger, default=0)
+    status = Column(SAEnum(DatasetFileStatus), default=DatasetFileStatus.NOT_FOUND, nullable=False)
+    
+    rows = Column(BigInteger, nullable=True)
+    columns = Column(Integer, nullable=True)
+    label_column = Column(String(100), nullable=True)
+    attack_classes = Column(JSON, nullable=True)
+    validation_details = Column(JSON, nullable=True)
+    data_quality = Column(JSON, nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    dataset = relationship("DatasetRegistry", back_populates="files")
+
+
+class DatasetProcessingRun(Base):
+    """Tracks preprocessing pipeline execution and reproducibility."""
+    __tablename__ = "dataset_processing_runs"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    dataset_id = Column(String(50), ForeignKey("dataset_registry.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(SAEnum(DatasetRunStatus), default=DatasetRunStatus.PENDING, nullable=False)
+    
+    config = Column(JSON, nullable=True)
+    transformation_metadata = Column(JSON, nullable=True)
+    rows_removed = Column(BigInteger, default=0)
+    rows_remaining = Column(BigInteger, default=0)
+    output_path = Column(String(500), nullable=True)
+    error_message = Column(Text, nullable=True)
+    
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    dataset = relationship("DatasetRegistry", back_populates="runs")
 
 
 # ─── Authentication & User Management Models ────────────────────────────────

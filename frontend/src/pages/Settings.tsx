@@ -289,8 +289,11 @@ export default function SettingsPage() {
                   onChange={(e) => setSettings(s => ({ ...s, selected_dataset: e.target.value }))}
                   className="input select text-xs py-2.5 bg-slate-50 focus:bg-white w-full max-w-full truncate"
                 >
-                  <option value="CIC-IDS2017 Benchmark">CIC-IDS2017 Benchmark Dataset</option>
+                  <option value="CIC-IDS2017 Benchmark">Historical CIC-IDS2017 Benchmark (Dataset Replay)</option>
                 </select>
+                <span className="text-[11px] text-slate-500 font-medium block mt-1.5">
+                  Truthfully streaming historical benchmark flow telemetry from <code className="bg-slate-100 px-1 py-0.5 rounded font-mono">data/raw/cic-ids2017/</code>.
+                </span>
               </div>
             </div>
           </Card>

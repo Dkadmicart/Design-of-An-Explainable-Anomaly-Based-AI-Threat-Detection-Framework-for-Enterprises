@@ -25,3 +25,14 @@ dist-ssr/
 Thumbs.db
 .vscode/
 .idea/
+
+# Large Datasets & Processed Files
+*.parquet
+*.csv
+data/raw/*
+data/processed/*
+data/metadata/*
+!data/raw/**/.gitkeep
+!data/processed/**/.gitkeep
+!data/metadata/**/.gitkeep
+
