@@ -15,9 +15,21 @@ async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit
 
 
 async def create_tables():
-    """Create all database tables."""
+    """Create all database tables and ensure column migrations for existing tables."""
+    from sqlalchemy import text
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+        def _migrate(connection):
+            try:
+                res = connection.execute(text("PRAGMA table_info(users)"))
+                cols = [r[1] for r in res.fetchall()]
+                if cols and "avatar_url" not in cols:
+                    connection.execute(text("ALTER TABLE users ADD COLUMN avatar_url VARCHAR(500)"))
+            except Exception:
+                pass
+
+        await conn.run_sync(_migrate)
 
 
 async def get_db():

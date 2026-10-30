@@ -19,6 +19,9 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import GoogleAuthButton from '../components/auth/GoogleAuthButton';
+import { DEMO_CREDENTIALS, validateWorkEmail, selectDemoCredentials } from '../services/authUtils';
+
+export { DEMO_CREDENTIALS };
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -43,11 +46,18 @@ export default function LoginPage() {
     if (isLoading) return;
 
     setErrorMessage(null);
+
+    const validation = validateWorkEmail(email);
+    if (!validation.isValid) {
+      setErrorMessage(validation.error || 'Please enter a valid work email address.');
+      return;
+    }
+
     setIsLoading(true);
     setAuthActionText('Authenticating credentials...');
 
     try {
-      await login(email.trim(), password);
+      await login(validation.normalized, password);
       navigate(destination, { replace: true });
     } catch (err: any) {
       setErrorMessage(err.message || 'Invalid email or password. Please verify your credentials.');
@@ -59,13 +69,16 @@ export default function LoginPage() {
   // Auto-Fill Form Fields for Pre-Configured Enterprise Roles
   const fillCredentials = (role: 'admin' | 'analyst') => {
     setActiveAccountFill(role);
-    if (role === 'admin') {
-      setEmail('admin@sentinelai.internal');
-      setPassword('SentinelAdmin2026!');
-    } else {
-      setEmail('analyst@sentinelai.internal');
-      setPassword('SentinelAnalyst2026!');
-    }
+    const creds = selectDemoCredentials(role);
+    setEmail(creds.email);
+    setPassword(creds.password);
+    setErrorMessage(null);
+  };
+
+  const clearForm = () => {
+    setEmail('');
+    setPassword('');
+    setActiveAccountFill(null);
     setErrorMessage(null);
   };
 
@@ -193,7 +206,7 @@ export default function LoginPage() {
         <div className="auth-card space-y-5">
           {/* Error Message Alert */}
           {errorMessage && (
-            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-semibold flex items-start gap-2.5 animate-fade-in">
+            <div data-testid="login-error-message" className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-semibold flex items-start gap-2.5 animate-fade-in">
               <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1 leading-relaxed">{errorMessage}</div>
             </div>
@@ -202,13 +215,18 @@ export default function LoginPage() {
           {/* ── 1. FORM WITH SIGN IN OPTION ON TOP ── */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="auth-field">
-              <label className="auth-label">Work Email</label>
+              <label className="auth-label" htmlFor="work-email">
+                Work Email
+              </label>
               <div className="auth-input-wrapper">
                 <span className="auth-input-icon">
                   <Mail size={16} />
                 </span>
                 <input
+                  id="work-email"
+                  name="email"
                   type="email"
+                  autoComplete="username"
                   required
                   value={email}
                   onChange={(e) => {
@@ -218,13 +236,16 @@ export default function LoginPage() {
                   placeholder="analyst@sentinelai.internal"
                   disabled={isLoading}
                   className="auth-input"
+                  data-testid="login-email-input"
                 />
               </div>
             </div>
 
             <div className="auth-field">
               <div className="flex items-center justify-between mb-1">
-                <label className="auth-label mb-0">Password</label>
+                <label className="auth-label mb-0" htmlFor="work-password">
+                  Password
+                </label>
                 <Link
                   to="/forgot-password"
                   className="text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors"
@@ -237,7 +258,11 @@ export default function LoginPage() {
                   <Lock size={16} />
                 </span>
                 <input
+                  id="work-password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  data-testid="login-password-input"
                   required
                   value={password}
                   onChange={(e) => {
@@ -266,6 +291,7 @@ export default function LoginPage() {
               type="submit"
               disabled={isLoading}
               className="auth-btn-primary"
+              data-testid="login-submit-btn"
             >
               {isLoading && !authActionText.includes('Google') ? (
                 <>
@@ -368,9 +394,21 @@ export default function LoginPage() {
                 </p>
               </div>
             </div>
-            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30">
-              EVALUATION
-            </span>
+            <div className="flex items-center gap-2">
+              {(email || password) && (
+                <button
+                  type="button"
+                  onClick={clearForm}
+                  className="text-[10px] font-bold text-amber-500 hover:text-amber-400 underline cursor-pointer mr-2"
+                  data-testid="login-clear-btn"
+                >
+                  Clear fields
+                </button>
+              )}
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                EVALUATION
+              </span>
+            </div>
           </div>
 
           {/* ── ROLE 1 CARD: SOC ADMINISTRATOR (STANDALONE CARD) ── */}
@@ -422,6 +460,7 @@ export default function LoginPage() {
                 </button>
                 <button
                   type="button"
+                  data-testid="demo-admin-btn"
                   onClick={() => fillCredentials('admin')}
                   disabled={isLoading}
                   className={`py-2 px-3.5 rounded-xl border font-bold text-xs transition-all cursor-pointer ${
@@ -515,6 +554,7 @@ export default function LoginPage() {
                 </button>
                 <button
                   type="button"
+                  data-testid="demo-analyst-btn"
                   onClick={() => fillCredentials('analyst')}
                   disabled={isLoading}
                   className={`py-2 px-3.5 rounded-xl border font-bold text-xs transition-all cursor-pointer ${
@@ -544,6 +584,7 @@ export default function LoginPage() {
           <p className="font-mono">
             Argon2id Key Derivation • TLS 1.3 End-to-End • SOC-2 Type II
           </p>
+
         </div>
       </div>
     </div>

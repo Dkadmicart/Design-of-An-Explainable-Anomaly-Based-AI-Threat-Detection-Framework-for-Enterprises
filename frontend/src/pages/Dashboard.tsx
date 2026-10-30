@@ -164,7 +164,12 @@ export default function DashboardPage() {
       {/* Page Header */}
       <PageHeader
         title="Security Operations Overview"
-        subtitle="Monitor network activity, identify threats, and investigate security incidents."
+        subtitle="Monitor network activity, identify threats, and investigate benchmark security incidents."
+        statusBadge={
+          <Badge variant="neutral" className="px-3 py-1 text-xs font-bold uppercase tracking-wider bg-slate-100 text-slate-700">
+            Data Source: Historical CIC-IDS2017 Benchmark
+          </Badge>
+        }
         actions={
           <div className="flex items-center gap-2.5 text-xs font-bold text-[var(--color-text-body)] bg-[var(--color-bg-card)] px-3.5 py-2 rounded-xl border border-[var(--color-border-base)] shadow-2xs select-none">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />

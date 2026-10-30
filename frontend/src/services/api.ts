@@ -1,6 +1,9 @@
 import type {
   DashboardSummary, NetworkEvent, Alert, MLModel, MitreTechnique,
-  Dataset, AppSettings, AttackDistribution, InvestigationResult
+  Dataset, AppSettings, AttackDistribution, InvestigationResult,
+  DatasetRegistry, DatasetFileRecord, DatasetSchema, DataQualityReport, LabelDistribution,
+  ModelMetricsResponse, ModelFeaturesResponse, ModelPredictRequest, ModelPredictResponse,
+  ModelExplainRequest, ModelExplainResponse
 } from '../types';
 import type { User, AuthResponse, AuditLogEntry, InviteUserPayload, UserRole } from '../types/auth';
 
@@ -238,14 +241,135 @@ export const api = {
     return fetchJson<{ models: MLModel[] }>('/models');
   },
 
+  getModel: async (modelId: string = 'active'): Promise<{ model: MLModel }> => {
+    return fetchJson<{ model: MLModel }>(`/models/${encodeURIComponent(modelId)}`);
+  },
+
+  getModelFeatures: async (modelId: string = 'active'): Promise<ModelFeaturesResponse> => {
+    return fetchJson<ModelFeaturesResponse>(`/models/${encodeURIComponent(modelId)}/features`);
+  },
+
+  getModelMetrics: async (modelId: string = 'active'): Promise<ModelMetricsResponse> => {
+    return fetchJson<ModelMetricsResponse>(`/models/${encodeURIComponent(modelId)}/metrics`);
+  },
+
+  predictThreat: async (payload: ModelPredictRequest, modelId?: string): Promise<ModelPredictResponse> => {
+    const endpoint = modelId ? `/models/${encodeURIComponent(modelId)}/predict` : '/models/predict';
+    return fetchJson<ModelPredictResponse>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  explainThreat: async (payload: ModelExplainRequest, modelId?: string): Promise<ModelExplainResponse> => {
+    const endpoint = modelId ? `/models/${encodeURIComponent(modelId)}/explain` : '/models/explain';
+    return fetchJson<ModelExplainResponse>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
   // MITRE ATT&CK
   getMitreTechniques: async (): Promise<{ techniques: MitreTechnique[] }> => {
     return fetchJson<{ techniques: MitreTechnique[] }>('/mitre/techniques');
   },
 
+  // Replay
+  startReplay: async (config?: { speed?: number; dataset_file?: string; batch_size?: number; loop?: boolean }): Promise<{
+    status: string;
+    message: string;
+    events_ingested?: number;
+    alerts_generated?: number;
+    source_file?: string;
+    status_detail?: Record<string, unknown>;
+  }> => {
+    return fetchJson('/replay/start', {
+      method: 'POST',
+      body: JSON.stringify(config || {}),
+    });
+  },
+
+  stepReplay: async (count: number = 5): Promise<{
+    status: string;
+    events_ingested: number;
+    alerts_generated: number;
+    events?: NetworkEvent[];
+    message?: string;
+    status_detail?: Record<string, unknown>;
+  }> => {
+    return fetchJson(`/replay/step?count=${count}`, { method: 'POST' });
+  },
+
+  pauseReplay: async (): Promise<{ status: string; is_paused?: boolean }> => {
+    return fetchJson('/replay/pause', { method: 'POST' });
+  },
+
+  resumeReplay: async (): Promise<{ status: string; is_paused?: boolean }> => {
+    return fetchJson('/replay/resume', { method: 'POST' });
+  },
+
+  stopReplay: async (): Promise<{ status: string; is_running?: boolean }> => {
+    return fetchJson('/replay/stop', { method: 'POST' });
+  },
+
+  getReplayStatus: async (): Promise<{
+    is_running: boolean;
+    is_paused: boolean;
+    speed: number;
+    events_sent: number;
+    total_events: number;
+    current_file: string | null;
+    elapsed_seconds: number;
+    worker_active?: boolean;
+    metrics?: Array<{
+      time: string;
+      events: number;
+      threats: number;
+      epoch_sec: number;
+    }>;
+  }> => {
+    return fetchJson('/replay/status');
+  },
+
   // Datasets
   getDatasets: async (): Promise<{ datasets: Dataset[] }> => {
     return fetchJson<{ datasets: Dataset[] }>('/datasets');
+  },
+
+  getDatasetDetails: async (id: string = 'cic-ids2017'): Promise<{ dataset: DatasetRegistry; overview: Record<string, unknown> }> => {
+    return fetchJson<{ dataset: DatasetRegistry; overview: Record<string, unknown> }>(`/datasets/${id}`);
+  },
+
+  getDatasetFiles: async (id: string = 'cic-ids2017'): Promise<{ dataset_id: string; files: DatasetFileRecord[] }> => {
+    return fetchJson<{ dataset_id: string; files: DatasetFileRecord[] }>(`/datasets/${id}/files`);
+  },
+
+  getDatasetSchema: async (id: string = 'cic-ids2017'): Promise<{ dataset_id: string; schema: DatasetSchema }> => {
+    return fetchJson<{ dataset_id: string; schema: DatasetSchema }>(`/datasets/${id}/schema`);
+  },
+
+  getDatasetQuality: async (id: string = 'cic-ids2017'): Promise<{ dataset_id: string; quality: DataQualityReport }> => {
+    return fetchJson<{ dataset_id: string; quality: DataQualityReport }>(`/datasets/${id}/quality`);
+  },
+
+  getDatasetLabels: async (id: string = 'cic-ids2017'): Promise<{ dataset_id: string; labels: LabelDistribution }> => {
+    return fetchJson<{ dataset_id: string; labels: LabelDistribution }>(`/datasets/${id}/labels`);
+  },
+
+  getDatasetStatistics: async (id: string = 'cic-ids2017'): Promise<{ dataset_id: string; statistics: { total_features: number; statistics: Record<string, Record<string, number>> } }> => {
+    return fetchJson<{ dataset_id: string; statistics: { total_features: number; statistics: Record<string, Record<string, number>> } }>(`/datasets/${id}/statistics`);
+  },
+
+  validateDataset: async (id: string = 'cic-ids2017'): Promise<{ status: string; result: Record<string, unknown> }> => {
+    return fetchJson(`/datasets/${id}/validate`, { method: 'POST' });
+  },
+
+  processDataset: async (id: string = 'cic-ids2017'): Promise<{ dataset_id: string; result: Record<string, unknown> }> => {
+    return fetchJson(`/datasets/${id}/process`, { method: 'POST' });
+  },
+
+  refreshDataset: async (id: string = 'cic-ids2017'): Promise<{ status: string; result: Record<string, unknown> }> => {
+    return fetchJson(`/datasets/${id}/refresh`, { method: 'POST' });
   },
 
   // Analytics

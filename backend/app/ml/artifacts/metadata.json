@@ -1,0 +1,13 @@
+{
+  "project": "SentinelAI",
+  "dataset": "CIC-IDS2017",
+  "task": "binary classification",
+  "n_features": 69,
+  "models": [
+    "logistic_regression",
+    "random_forest",
+    "xgboost"
+  ],
+  "scikit_learn_version": "1.6.1",
+  "xgboost_version": "3.4.1"
+}
