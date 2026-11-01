@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Search, Bell, Menu, PanelLeftClose, PanelLeftOpen,
+  Search, Menu, PanelLeftClose, PanelLeftOpen,
   ChevronDown, LogOut, Shield, User as UserIcon, X, Sun, Moon,
   Database, Radio
 } from 'lucide-react';
@@ -9,6 +9,7 @@ import clsx from 'clsx';
 import type { EnvironmentMode } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import NotificationCenter from './NotificationCenter';
 
 interface HeaderProps {
   mode: EnvironmentMode;
@@ -177,15 +178,8 @@ export default function Header({
 
         {/* Right Section: Action Utilities Cluster (Notifications + Theme Switcher + User Profile) */}
         <div className="flex items-center gap-2.5 sm:gap-3 flex-shrink-0">
-          {/* Notifications Button */}
-          <button
-            className="relative w-10 h-10 flex items-center justify-center rounded-xl border border-[var(--color-border-base)] bg-[var(--color-bg-card)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text-main)] transition-colors cursor-pointer flex-shrink-0 shadow-2xs"
-            aria-label="Notifications"
-            title="Notifications"
-          >
-            <Bell size={18} />
-            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
-          </button>
+          {/* Enterprise Threat Notification Center */}
+          <NotificationCenter />
 
           {/* Theme Regulator Button (Instant toggle, No Color Fade) */}
           <button

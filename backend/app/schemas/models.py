@@ -25,6 +25,8 @@ class ModelPredictRequest(BaseModel):
 
 class ModelPredictResponse(BaseModel):
     """Response payload for model prediction and risk score calculation."""
+    model_config = {"protected_namespaces": ()}
+
     prediction: str = Field(..., description="Binary classification outcome: 'BENIGN' or 'ATTACK'.")
     confidence: float = Field(..., description="Probability associated with the predicted class (0.0 to 1.0).")
     probabilities: Dict[str, float] = Field(..., description="Calibrated class probabilities for BENIGN and ATTACK.")

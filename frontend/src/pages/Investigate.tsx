@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, ShieldAlert } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '../services/api';
@@ -10,9 +11,20 @@ import { DataTable } from '../components/common/DataTable';
 import { Badge } from '../components/common/Badge';
 
 export default function InvestigatePage() {
-  const [targetEntity, setTargetEntity] = useState('192.168.1.105');
-  const [inputQuery, setInputQuery] = useState('192.168.1.105');
+  const [searchParams] = useSearchParams();
+  const queryParam = searchParams.get('target') || searchParams.get('ip') || searchParams.get('query');
+  const defaultTarget = queryParam || '192.168.1.105';
+
+  const [targetEntity, setTargetEntity] = useState(defaultTarget);
+  const [inputQuery, setInputQuery] = useState(defaultTarget);
   const [investigationData, setInvestigationData] = useState<InvestigationResult | null>(null);
+
+  useEffect(() => {
+    if (queryParam && queryParam !== targetEntity) {
+      setTargetEntity(queryParam);
+      setInputQuery(queryParam);
+    }
+  }, [queryParam]);
 
   useEffect(() => {
     if (targetEntity) {
