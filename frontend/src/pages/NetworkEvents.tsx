@@ -8,6 +8,7 @@ import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { DataTable } from '../components/common/DataTable';
 import { Badge } from '../components/common/Badge';
+import { formatFlowDuration, formatRiskScore, formatProcessingTime } from '../services/replayMetrics';
 
 export default function NetworkEventsPage() {
   const [search, setSearch] = useState('');
@@ -103,7 +104,7 @@ export default function NetworkEventsPage() {
           <DataTable>
             <thead>
               <tr>
-                <th>Timestamp</th>
+                <th title="Actual replay ingestion timestamp in local time (derived from server UTC processing time).">Processed At (Local)</th>
                 <th>Source IP</th>
                 <th>Destination IP</th>
                 <th>Source Port</th>
@@ -112,21 +113,21 @@ export default function NetworkEventsPage() {
                 <th>Flow Duration</th>
                 <th>Total Packets</th>
                 <th>Model Prediction</th>
-                <th>Risk Score</th>
+                <th>Risk Score / 100</th>
               </tr>
             </thead>
             <tbody>
               {filteredEvents.map((evt) => (
                 <tr key={evt.id} className={clsx(evt.prediction !== 'BENIGN' && 'row-suspicious')}>
                   <td className="text-xs font-mono text-slate-500 whitespace-nowrap">
-                    {new Date(evt.timestamp).toLocaleTimeString()}
+                    {formatProcessingTime(evt.timestamp).timeStr}.{formatProcessingTime(evt.timestamp).msStr}
                   </td>
                   <td className="text-xs font-mono font-bold text-slate-900">{evt.source_ip}</td>
                   <td className="text-xs font-mono text-slate-600">{evt.destination_ip}</td>
                   <td className="text-xs font-mono text-slate-600">{evt.source_port}</td>
                   <td className="text-xs font-mono text-slate-600">{evt.destination_port}</td>
                   <td className="text-xs font-bold text-slate-900">{evt.protocol}</td>
-                  <td className="text-xs text-slate-600">{(evt.flow_duration / 1000).toFixed(1)}s</td>
+                  <td className="text-xs text-slate-600">{formatFlowDuration(evt.flow_duration)}</td>
                   <td className="text-xs text-slate-600">{evt.total_fwd_packets + evt.total_bwd_packets} pkts</td>
                   <td>
                     <Badge variant={evt.prediction === 'BENIGN' ? 'low' : 'critical'}>
@@ -140,7 +141,7 @@ export default function NetworkEventsPage() {
                       evt.risk_score >= 50 ? 'bg-amber-50 text-amber-700' :
                       'text-slate-600'
                     )}>
-                      {evt.risk_score}%
+                      {formatRiskScore(evt.risk_score)}
                     </span>
                   </td>
                 </tr>

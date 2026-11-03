@@ -8,6 +8,7 @@ import {
   AlertCircle,
   Loader2,
   ArrowRight,
+  Check,
   Eye,
   EyeOff,
   Sun,
@@ -17,6 +18,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import GoogleAuthButton from '../components/auth/GoogleAuthButton';
+import { validateWorkEmail } from '../services/authUtils';
 
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -30,6 +32,7 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const destination = (location.state as any)?.from?.pathname || '/dashboard';
 
@@ -37,20 +40,29 @@ export default function SignupPage() {
     e.preventDefault();
     if (isLoading) return;
 
+    const validation = validateWorkEmail(email);
+    if (!validation.isValid) {
+      setErrorMessage(validation.error || 'Please enter a valid work email address.');
+      return;
+    }
+
     if (password.length < 8) {
       setErrorMessage('Password must be at least 8 characters long.');
       return;
     }
 
     setErrorMessage(null);
+    setSuccessMessage(null);
     setIsLoading(true);
 
     try {
-      await register(email.trim(), password, displayName.trim());
-      navigate(destination, { replace: true });
+      await register(validation.normalized, password, displayName.trim());
+      setSuccessMessage('Account created successfully! Redirecting to workspace...');
+      setTimeout(() => {
+        navigate(destination, { replace: true });
+      }, 700);
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to create account. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -149,9 +161,17 @@ export default function SignupPage() {
 
         {/* ━━━━ PRIMARY AUTHENTICATION CARD ━━━━ */}
         <div className="auth-card space-y-5">
+          {/* Success Message Alert */}
+          {successMessage && (
+            <div data-testid="signup-success-message" className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs font-semibold flex items-start gap-2.5 animate-fade-in">
+              <Check size={16} className="text-emerald-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 leading-relaxed">{successMessage}</div>
+            </div>
+          )}
+
           {/* Error Message Alert */}
           {errorMessage && (
-            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-semibold flex items-start gap-2.5 animate-fade-in">
+            <div data-testid="signup-error-message" className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-semibold flex items-start gap-2.5 animate-fade-in">
               <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1 leading-relaxed">{errorMessage}</div>
             </div>
@@ -282,6 +302,7 @@ export default function SignupPage() {
             Already have an account?{' '}
             <Link
               to="/login"
+              state={{ registeredEmail: email ? email.trim().toLowerCase() : undefined }}
               className="font-bold text-amber-500 hover:text-amber-400 transition-colors"
             >
               Sign In here

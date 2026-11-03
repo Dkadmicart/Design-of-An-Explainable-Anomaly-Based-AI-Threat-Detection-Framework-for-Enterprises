@@ -215,6 +215,8 @@ class XGBoostDetector(DetectionModel):
         _, imputed = self.prepare_feature_array(features)
         raw_pred = int(self.model.predict(imputed)[0])
         probas = self.model.predict_proba(imputed)[0]
+        dmat = xgb.DMatrix(imputed)
+        margin_val = float(self.booster.predict(dmat, output_margin=True)[0])
 
         p_benign = float(probas[0])
         p_attack = float(probas[1])
@@ -231,6 +233,7 @@ class XGBoostDetector(DetectionModel):
             },
             model_name=self.model_name,
             model_version=self.model_version,
+            margin=round(margin_val, 4),
         )
 
     def predict_batch(self, feature_batch: List[Dict[str, float]]) -> List[PredictionResult]:
@@ -345,6 +348,8 @@ class XGBoostDetector(DetectionModel):
             anomaly_score=anomaly_score,
             attack_type=effective_attack_type,
             historical_risk=historical_risk,
+            margin=pred_result.margin,
+            flow_features=features,
         )
 
         severity = RiskScorer.categorize(risk_score)
@@ -359,6 +364,7 @@ class XGBoostDetector(DetectionModel):
             "attack_type": effective_attack_type if pred_result.prediction == "ATTACK" else None,
             "model_name": self.model_name,
             "model_version": self.model_version,
+            "margin": pred_result.margin,
         }
 
 

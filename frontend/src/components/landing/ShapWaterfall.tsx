@@ -14,6 +14,7 @@ interface ShapWaterfallProps {
   anomalyScore: number;
   className?: string;
   theme?: 'dark' | 'light';
+  maxFeatures?: number;
 }
 
 export const ShapWaterfall: React.FC<ShapWaterfallProps> = ({
@@ -21,7 +22,9 @@ export const ShapWaterfall: React.FC<ShapWaterfallProps> = ({
   anomalyScore,
   className = '',
   theme = 'dark',
+  maxFeatures,
 }) => {
+  const displayedFeatures = maxFeatures ? features.slice(0, maxFeatures) : features;
   const isLight = theme === 'light';
 
   return (
@@ -50,7 +53,7 @@ export const ShapWaterfall: React.FC<ShapWaterfallProps> = ({
 
       {/* Feature Contributions List — Clean, elegant attribution bars */}
       <div className="space-y-2.5">
-        {features.slice(0, 4).map((feat, idx) => {
+        {displayedFeatures.map((feat, idx) => {
           const isMaliciousPush = feat.shapVal >= 0;
           return (
             <div

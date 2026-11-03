@@ -13,7 +13,7 @@ import logging
 import time
 import uuid
 from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
@@ -27,6 +27,7 @@ from app.models.database import (
     AlertStatus,
 )
 from app.ml.xgboost_detector import get_xgboost_detector
+from app.services.settings_service import get_active_alert_threshold
 
 logger = logging.getLogger("sentinelai.replay_loader")
 settings = get_settings()
@@ -54,6 +55,13 @@ def sanitize_flow_features(raw_features: Dict[str, Any]) -> Dict[str, float]:
     return cleaned
 
 
+def _ensure_utc(dt: datetime) -> datetime:
+    """Ensure datetime is timezone-aware in UTC."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 class ReplayLoaderService:
     """
     Manages stateful dataset replay streaming, feature sanitization,
@@ -71,11 +79,15 @@ class ReplayLoaderService:
         self.speed = 1.0
         self.events_sent = 0
         self.total_events = 0
+        self.alerts_generated = 0
         self.current_file: Optional[str] = None
         self.start_timestamp: Optional[float] = None
         self.current_index = 0
         self.replay_pass = 1
         self.loop = False
+        self.is_completed = False
+        self.last_commit_status = "idle"
+        self._source_total_rows: Optional[int] = None
         self.last_ingested_ids: List[str] = []
         # Background worker state
         self._worker_task: Optional[asyncio.Task] = None
@@ -97,9 +109,12 @@ class ReplayLoaderService:
         return {
             "is_running": self.is_running,
             "is_paused": self.is_paused,
+            "is_completed": self.is_completed,
+            "last_commit_status": self.last_commit_status,
             "speed": self.speed,
             "events_sent": self.events_sent,
             "total_events": self.total_events,
+            "alerts_generated": self.alerts_generated,
             "current_file": self.current_file,
             "current_index": self.current_index,
             "replay_pass": self.replay_pass,
@@ -129,6 +144,7 @@ class ReplayLoaderService:
         then reset stream pointer. Awaiting the task ensures the worker's finally
         block completes before we return.
         """
+        was_running = self.is_running
         self.is_running = False
         self.is_paused = False
         if self._worker_task and not self._worker_task.done():
@@ -142,10 +158,17 @@ class ReplayLoaderService:
         self.current_index = 0
         self.replay_pass = 1
         self.events_sent = 0
+        self.alerts_generated = 0
         self.metrics_history = []
         self._rolling_events = []
         logger.info("Replay stopped; worker cancelled and awaited. Stream pointer reset.")
-        return {"status": "stopped", "is_running": False}
+        return {
+            "status": "stopped",
+            "is_running": False,
+            "was_running": was_running,
+            "is_completed": self.is_completed,
+            "last_commit_status": self.last_commit_status,
+        }
 
     # ─── Dataset Resolution ────────────────────────────────────────────────────
 
@@ -163,6 +186,8 @@ class ReplayLoaderService:
                 requested_file,
                 os.path.join(settings.DATASET_PATH, "cic-ids2017", requested_file),
                 os.path.join(settings.DATASET_PATH, requested_file),
+                os.path.join("..", settings.DATASET_PATH, "cic-ids2017", requested_file),
+                os.path.join("..", settings.DATASET_PATH, requested_file),
             ]
             if os.path.basename(DEFAULT_CSV_PATH).lower() == requested_file.lower():
                 candidates.append(DEFAULT_CSV_PATH)
@@ -173,15 +198,21 @@ class ReplayLoaderService:
             raise FileNotFoundError(f"Requested dataset file '{requested_file}' not found.")
 
         # 2. Check for real Parquet files in data/raw/cic-ids2017
-        cic_dir = os.path.join(settings.DATASET_PATH, "cic-ids2017")
-        if os.path.isdir(cic_dir):
-            parquets = [
-                os.path.join(cic_dir, f)
-                for f in os.listdir(cic_dir)
-                if f.lower().endswith(".parquet") and os.path.getsize(os.path.join(cic_dir, f)) > 100
-            ]
-            if parquets:
-                return parquets[0], "parquet"
+        cic_dirs = [
+            os.path.join(settings.DATASET_PATH, "cic-ids2017"),
+            os.path.join("..", settings.DATASET_PATH, "cic-ids2017"),
+            settings.DATASET_PATH,
+            os.path.join("..", settings.DATASET_PATH),
+        ]
+        for cic_dir in cic_dirs:
+            if os.path.isdir(cic_dir):
+                parquets = [
+                    os.path.join(cic_dir, f)
+                    for f in os.listdir(cic_dir)
+                    if f.lower().endswith(".parquet") and os.path.getsize(os.path.join(cic_dir, f)) > 100
+                ]
+                if parquets:
+                    return parquets[0], "parquet"
 
         # 3. Check for verified D:/shap_sample_features.csv
         if os.path.exists(DEFAULT_CSV_PATH):
@@ -210,6 +241,7 @@ class ReplayLoaderService:
             pf = pq.ParquetFile(source_path)
             table = pf.read()
             df = table.to_pandas()
+            df = df.iloc[start_idx : start_idx + count]
         else:
             # CSV stream with exact 69 columns
             df = pd.read_csv(source_path, skiprows=range(1, start_idx + 1), nrows=count)
@@ -303,7 +335,7 @@ class ReplayLoaderService:
             # Genuine XGBoost inference
             score_res = detector.score(
                 features=cleaned_features,
-                attack_type=None,
+                attack_type=ground_truth_label,
                 historical_risk=0.0,
             )
 
@@ -324,9 +356,8 @@ class ReplayLoaderService:
                 dst_ip = "192.168.10.50"
 
             event_id = str(uuid.uuid4())
-            # Assign authentic sequential sub-second processing timestamp
-            interval_ms = int(idx * (50.0 / max(0.1, self.speed)))
-            event_time = base_time + timedelta(milliseconds=interval_ms)
+            # Assign actual UTC processing/ingestion timestamp (with microsecond monotonicity for distinct ordering)
+            event_time = datetime.now(timezone.utc) + timedelta(microseconds=idx)
 
             event = Event(
                 id=event_id,
@@ -358,8 +389,9 @@ class ReplayLoaderService:
             db.add(event)
 
             # Alert creation strictly follows documented threshold rules
-            # Alert generated only when risk_score >= ALERT_RISK_THRESHOLD (50.0)
-            if score_res["risk_score"] >= settings.ALERT_RISK_THRESHOLD or score_res["prediction"] == "ATTACK":
+            # Alert generated when risk_score >= active_threshold or prediction == "ATTACK"
+            active_threshold = get_active_alert_threshold()
+            if score_res["risk_score"] >= active_threshold or score_res["prediction"] == "ATTACK":
                 alert = Alert(
                     id=str(uuid.uuid4()),
                     event_id=event_id,
@@ -389,25 +421,19 @@ class ReplayLoaderService:
                 created_alerts.append(alert)
                 db.add(alert)
 
-        # Update service tracking counters (no state flags touched)
-        self.current_index += len(created_events)
-        self.events_sent += len(created_events)
-        self.total_events += len(created_events)
-        self.last_ingested_ids = [e.id for e in created_events]
-
-        # Calculate authentic rate telemetry from actual event timestamps over rolling 30-second window
+        # Update rolling rate telemetry window
         if created_events:
             for e in created_events:
                 is_threat = bool(e.prediction and e.prediction != "BENIGN")
                 self._rolling_events.append({
                     "id": e.id,
-                    "timestamp": e.timestamp,
+                    "timestamp": e.timestamp if getattr(e, "timestamp", None) is not None else datetime.now(timezone.utc),
                     "is_threat": is_threat,
                 })
 
-            latest_ts = max(e["timestamp"] for e in self._rolling_events)
+            latest_ts = max(_ensure_utc(e["timestamp"]) for e in self._rolling_events)
             cutoff = latest_ts - timedelta(seconds=30)
-            self._rolling_events = [e for e in self._rolling_events if e["timestamp"] >= cutoff]
+            self._rolling_events = [e for e in self._rolling_events if _ensure_utc(e["timestamp"]) >= cutoff]
 
             unique_events: Dict[str, Dict[str, Any]] = {}
             for e in self._rolling_events:
@@ -416,10 +442,9 @@ class ReplayLoaderService:
 
             all_unique = list(unique_events.values())
             if len(all_unique) >= 2:
-                earliest_ts = min(e["timestamp"] for e in all_unique)
+                earliest_ts = min(_ensure_utc(e["timestamp"]) for e in all_unique)
                 elapsed_sec = (latest_ts - earliest_ts).total_seconds()
 
-                # Safe handling of zero elapsed time without clamping or division by zero
                 if elapsed_sec > 0:
                     threat_count = sum(1 for e in all_unique if e["is_threat"])
                     events_per_sec = round(len(all_unique) / elapsed_sec, 1)
@@ -441,22 +466,35 @@ class ReplayLoaderService:
                     if len(self.metrics_history) > 60:
                         self.metrics_history = self.metrics_history[-60:]
 
-        logger.info(
-            "Replay batch: %d events persisted, %d alerts generated from '%s' (index now %d).",
-            len(created_events),
-            len(created_alerts),
-            self.current_file,
-            self.current_index,
-        )
-
         return {
             "status": "ok",
             "events_ingested": len(created_events),
             "alerts_generated": len(created_alerts),
             "created_events": created_events,
+            "created_alerts": created_alerts,
         }
 
     # ─── Background Worker ────────────────────────────────────────────────────
+
+    def _apply_batch_success(self, result: Dict[str, Any]) -> None:
+        """Apply counter, state, and pointer updates strictly after transaction commit."""
+        created_events = result.get("created_events", [])
+        created_alerts = result.get("created_alerts", [])
+        n_events = len(created_events)
+        n_alerts = len(created_alerts)
+        self.current_index += n_events
+        self.events_sent += n_events
+        self.total_events += n_events
+        self.alerts_generated += n_alerts
+        self.last_ingested_ids = [e.id for e in created_events]
+
+        logger.info(
+            "Replay batch committed: %d events persisted, %d alerts generated from '%s' (index now %d).",
+            n_events,
+            n_alerts,
+            self.current_file,
+            self.current_index,
+        )
 
     async def _run_worker(self, batch_size: int) -> None:
         """
@@ -491,27 +529,61 @@ class ReplayLoaderService:
                     continue
 
                 # Each iteration owns a properly-scoped session; no session leaks
+                batch_committed = False
+                result = None
                 async with async_session() as db:
                     try:
                         result = await self._ingest_one_batch(db, batch_size)
-                        await db.commit()
+                        if result["status"] == "ok":
+                            await asyncio.shield(db.commit())
+                            batch_committed = True
+                            self._apply_batch_success(result)
+                            self.last_commit_status = "committed"
+                    except asyncio.CancelledError:
+                        if not batch_committed:
+                            try:
+                                await db.rollback()
+                            except Exception:
+                                pass
+                            self.last_commit_status = "rolled_back"
+                            logger.warning(
+                                "Replay worker received cancellation during batch processing at index %d; transaction rolled back safely.",
+                                self.current_index,
+                            )
+                        else:
+                            logger.info(
+                                "Replay worker received cancellation after batch commit at index %d; transaction committed safely.",
+                                self.current_index,
+                            )
+                        raise
                     except Exception as batch_exc:
                         await db.rollback()
+                        self.last_commit_status = "rolled_back"
                         logger.exception(
-                            "Replay worker batch error — stopping worker: %s", batch_exc
+                            "Replay worker batch error at index %d ? stopping worker: %s",
+                            self.current_index, batch_exc,
                         )
                         self.is_running = False
                         break
 
-                if result["status"] == "completed":
+                if result and result["status"] == "completed":
+                    self.is_running = False
+                    self.is_completed = True
                     logger.info(
-                        "Replay worker: dataset exhausted at index %d. Total events sent: %d.",
+                        "Replay worker: dataset exhausted and finalized at index %d. Total events sent: %d.",
                         self.current_index, self.events_sent,
                     )
-                    self.is_running = False
                     break
 
-                # Sleep between batches; speed controls throughput
+                if self._source_total_rows is not None and self.current_index >= self._source_total_rows:
+                    if not self.loop:
+                        self.is_running = False
+                        self.is_completed = True
+                        logger.info(
+                            "Replay worker: reached total rows (%d) at index %d. Final batch committed. Marking completed.",
+                            self._source_total_rows, self.current_index,
+                        )
+                        break
                 interval = max(0.5, 2.0 / max(0.1, self.speed))
                 await asyncio.sleep(interval)
 
@@ -573,6 +645,8 @@ class ReplayLoaderService:
 
         if not self.is_running:
             self.metrics_history = []
+            self.events_sent = 0
+            self.alerts_generated = 0
         self._rolling_events = []
 
         self.loop = loop
@@ -586,10 +660,24 @@ class ReplayLoaderService:
         self._worker_batch_size = batch_size
 
         # Ingest first batch synchronously — provides immediate HTTP feedback with event counts
+        if source_fmt == 'parquet':
+            try:
+                pf = pq.ParquetFile(source_path)
+                self._source_total_rows = pf.metadata.num_rows
+            except Exception:
+                self._source_total_rows = None
+        else:
+            self._source_total_rows = None
+
+        self.is_completed = False
+        self.last_commit_status = 'idle'
+
         first_result = await self._ingest_one_batch(db, batch_size)
 
         if first_result["status"] == "completed":
             # Dataset exhausted on first call (very small file or large batch_size)
+            self.is_completed = True
+            self.is_running = False
             return {
                 "status": "completed",
                 "message": f"Dataset replay completed at end of file '{self.current_file}' (processed {self.current_index} rows).",
@@ -601,6 +689,22 @@ class ReplayLoaderService:
 
         # Commit first batch. get_db() will attempt a harmless second commit (no pending ops).
         await db.commit()
+        self._apply_batch_success(first_result)
+        self.last_commit_status = 'committed'
+
+        if self._source_total_rows is not None and self.current_index >= self._source_total_rows:
+            if not self.loop:
+                self.is_completed = True
+                self.is_running = False
+                logger.info('start_replay: dataset completed after first batch (%d rows).', self.current_index)
+                return {
+                    'status': 'completed',
+                    'message': f"Dataset replay completed at end of file '{self.current_file}' (processed {self.current_index} rows).",
+                    'events_ingested': first_result['events_ingested'],
+                    'alerts_generated': first_result['alerts_generated'],
+                    'source_file': self.current_file,
+                    'status_detail': self.get_status(),
+                }
 
         # Mark running after the first batch is safely persisted
         self.is_running = True
@@ -684,6 +788,13 @@ class ReplayLoaderService:
             }
 
         await db.commit()
+        self._apply_batch_success(ingest_res)
+        self.last_commit_status = 'committed'
+
+        if self._source_total_rows is not None and self.current_index >= self._source_total_rows:
+            if not self.loop:
+                self.is_running = False
+                self.is_completed = True
 
         return {
             "status": "stepped",
@@ -692,7 +803,7 @@ class ReplayLoaderService:
             "events": [
                 {
                     "id": e.id,
-                    "timestamp": e.timestamp.isoformat(),
+                    "timestamp": e.timestamp.replace(tzinfo=timezone.utc).isoformat() if e.timestamp.tzinfo is None else e.timestamp.isoformat(),
                     "source_ip": e.source_ip,
                     "destination_ip": e.destination_ip,
                     "source_port": e.source_port,

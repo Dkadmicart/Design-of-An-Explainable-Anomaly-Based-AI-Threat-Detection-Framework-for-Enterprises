@@ -8,7 +8,7 @@
  * 2. Threat Detections: Threats / minute (30-second rolling window)
  */
 
-import type { NetworkEvent } from '../types';
+import type { NetworkEvent, TimelinePoint } from '../types';
 
 export interface StreamMetric {
   time: string;       // Formatted HH:MM:SS
@@ -280,3 +280,160 @@ export function mergeStreamMetrics(
 
   return sorted.slice(-maxPoints);
 }
+
+/**
+ * Format raw CIC-IDS2017 flow duration (recorded in microseconds µs by CICFlowMeter):
+ * - >= 1,000,000 µs: display in seconds (e.g. "1.5s", "105.1s")
+ * - >= 1,000 µs: display in milliseconds (e.g. "66.3ms", "182.4ms")
+ * - < 1,000 µs: display in microseconds (e.g. "239µs", "52µs")
+ */
+export function formatFlowDuration(durationMicros: number | undefined | null): string {
+  if (durationMicros === undefined || durationMicros === null || Number.isNaN(Number(durationMicros))) {
+    return '0µs';
+  }
+  const val = Math.max(0, Number(durationMicros));
+  if (val >= 1_000_000) {
+    return `${(val / 1_000_000).toFixed(1)}s`;
+  }
+  if (val >= 1_000) {
+    return `${(val / 1_000).toFixed(1)}ms`;
+  }
+  return `${Math.round(val)}µs`;
+}
+
+/**
+ * Format 0–100 composite risk score:
+ * - Rounded to 1 decimal place, strictly without '%' suffix.
+ */
+export function formatRiskScore(riskScore: number | undefined | null): string {
+  if (riskScore === undefined || riskScore === null || Number.isNaN(Number(riskScore))) {
+    return '0.0';
+  }
+  const val = Math.min(100, Math.max(0, Number(riskScore)));
+  return val.toFixed(1);
+}
+
+/**
+ * Safely parse a replay event timestamp as UTC.
+ * Ensures ISO strings without an explicit timezone offset are treated as UTC,
+ * preventing browser local-time parsing misinterpretations.
+ */
+export function parseUtcTimestamp(ts: string | number | Date | undefined | null): Date {
+  if (!ts) return new Date();
+  if (ts instanceof Date) return ts;
+  if (typeof ts === 'number') return new Date(ts);
+  if (typeof ts === 'string') {
+    const trimmed = ts.trim();
+    if (!trimmed.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(trimmed)) {
+      return new Date(trimmed + 'Z');
+    }
+    return new Date(trimmed);
+  }
+  return new Date(ts);
+}
+
+/**
+ * Format a replay processing timestamp for display:
+ * Shows the user's local time with milliseconds.
+ */
+export function formatProcessingTime(ts: string | number | Date | undefined | null): { timeStr: string; msStr: string } {
+  const d = parseUtcTimestamp(ts);
+  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const msStr = String(d.getMilliseconds()).padStart(3, '0');
+  return { timeStr, msStr };
+}
+
+/**
+ * Format a TimelinePoint's UTC timestamp into the user's local timezone for chart display.
+ */
+export function formatTimelineLocalTime(isoUtcTimestamp: string, bucketSeconds: number = 3600): string {
+  const d = parseUtcTimestamp(isoUtcTimestamp);
+  if (bucketSeconds < 60) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  }
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+/**
+ * Categorize a network flow event into timeline classes following project thresholds:
+ * - 'critical': risk >= 75.0 (CRITICAL_RISK_THRESHOLD)
+ * - 'suspicious': 50.0 <= risk < 75.0 (ALERT_RISK_THRESHOLD) or prediction/attack_type != 'BENIGN'
+ * - 'normal': benign event with risk < 50.0
+ */
+export function categorizeTimelineEvent(event: {
+  risk_score?: number | null;
+  prediction?: string | null;
+  attack_type?: string | null;
+}): 'normal' | 'suspicious' | 'critical' {
+  const risk = Number(event.risk_score ?? 0);
+  const pred = event.prediction || 'BENIGN';
+  const att = event.attack_type || 'BENIGN';
+
+  if (risk >= 75.0) {
+    return 'critical';
+  }
+  if (risk >= 50.0 || pred !== 'BENIGN' || att !== 'BENIGN') {
+    return 'suspicious';
+  }
+  return 'normal';
+}
+
+/**
+ * Client-side aggregation of events into TimelinePoint buckets.
+ */
+export function aggregateTimelineEvents(
+  events: Array<{
+    timestamp: string | Date | number;
+    risk_score?: number | null;
+    prediction?: string | null;
+    attack_type?: string | null;
+  }>,
+  bucketSeconds: number = 300
+): TimelinePoint[] {
+  if (!events || events.length === 0) return [];
+
+  const bSec = Math.max(10, bucketSeconds);
+  const buckets = new Map<number, { normal: number; suspicious: number; critical: number; total: number }>();
+
+  const epochs: number[] = [];
+  for (const e of events) {
+    const d = parseUtcTimestamp(e.timestamp);
+    const epoch = Math.floor(d.getTime() / 1000);
+    if (Number.isNaN(epoch)) continue;
+
+    epochs.push(epoch);
+    const bEpoch = Math.floor(epoch / bSec) * bSec;
+    const cat = categorizeTimelineEvent(e);
+
+    const curr = buckets.get(bEpoch) || { normal: 0, suspicious: 0, critical: 0, total: 0 };
+    curr[cat] += 1;
+    curr.total += 1;
+    buckets.set(bEpoch, curr);
+  }
+
+  if (epochs.length === 0) return [];
+
+  const minEpoch = Math.min(...epochs);
+  const maxEpoch = Math.max(...epochs);
+  const minB = Math.floor(minEpoch / bSec) * bSec;
+  const maxB = Math.floor(maxEpoch / bSec) * bSec;
+
+  const points: TimelinePoint[] = [];
+  for (let b = minB; b <= maxB; b += bSec) {
+    const data = buckets.get(b) || { normal: 0, suspicious: 0, critical: 0, total: 0 };
+    const dt = new Date(b * 1000);
+    const isoStr = dt.toISOString();
+    points.push({
+      time: formatTimelineLocalTime(isoStr, bSec),
+      timestamp: isoStr,
+      epoch: b,
+      normal: data.normal,
+      suspicious: data.suspicious,
+      critical: data.critical,
+      total: data.total,
+    });
+  }
+
+  return points;
+}
+

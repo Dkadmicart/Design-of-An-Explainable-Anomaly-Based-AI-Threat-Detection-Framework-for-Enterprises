@@ -510,3 +510,16 @@ class LoginAttempt(Base):
     attempt_time = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     successful = Column(Boolean, default=False, nullable=False)
 
+class PlatformSetting(Base):
+    """Platform configuration and detection engine preferences."""
+    __tablename__ = "platform_settings"
+
+    id = Column(String(50), primary_key=True, default="default")
+    detection_mode = Column(String(50), nullable=False, default="binary")
+    alert_threshold = Column(Float, nullable=False, default=50.0)
+    replay_speed = Column(Float, nullable=False, default=1.0)
+    notifications_enabled = Column(Boolean, nullable=False, default=True)
+    selected_model = Column(String(100), nullable=False, default="XGBoost Grouped Classifier")
+    selected_dataset = Column(String(100), nullable=False, default="CIC-IDS2017 Benchmark")
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+

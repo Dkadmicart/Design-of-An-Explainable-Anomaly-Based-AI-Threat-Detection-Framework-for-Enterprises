@@ -7,7 +7,7 @@ export const DEMO_CREDENTIALS = {
   analyst: {
     email: 'analyst@sentinelai.internal',
     password: 'SentinelAnalyst2026!',
-    role: 'ANALYST',
+    role: 'SECURITY_ANALYST',
   },
 } as const;
 
@@ -22,11 +22,11 @@ export function validateWorkEmail(email: string): { isValid: boolean; normalized
   if (!emailRegex.test(trimmed)) {
     return {
       isValid: false,
-      normalized: trimmed,
+      normalized: trimmed.toLowerCase(),
       error: 'Please enter a valid work email address (e.g. analyst@sentinelai.internal).',
     };
   }
-  return { isValid: true, normalized: trimmed };
+  return { isValid: true, normalized: trimmed.toLowerCase() };
 }
 
 export function selectDemoCredentials(role: DemoRole): { email: string; password: string } {

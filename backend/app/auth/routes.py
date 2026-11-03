@@ -104,15 +104,17 @@ async def login(
     client_ip = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
 
+    norm_email = credentials.email.strip().lower()
+
     # Rate limiting check
-    if await check_rate_limit(credentials.email, db) or (client_ip and await check_rate_limit(client_ip, db)):
+    if await check_rate_limit(norm_email, db) or (client_ip and await check_rate_limit(client_ip, db)):
         await create_audit_log(
             db=db,
             action="LOGIN_BLOCKED_RATE_LIMITED",
             resource="auth:login",
             status_code="REJECTED",
             ip_address=client_ip,
-            details={"email": credentials.email},
+            details={"email": norm_email},
         )
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

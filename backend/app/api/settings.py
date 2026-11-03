@@ -1,24 +1,46 @@
 """Settings API routes."""
-from fastapi import APIRouter
-from app.schemas import SettingsUpdate
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Dict, Any
+
+from app.database.session import get_db
+from app.schemas.settings import SettingsUpdate, SettingsResponse
+from app.services.settings_service import get_or_create_settings, update_settings
 
 router = APIRouter()
 
 
-@router.get("")
-async def get_settings():
+@router.get("", response_model=Dict[str, Any])
+async def get_settings(db: AsyncSession = Depends(get_db)):
     """Get current platform settings."""
+    record = await get_or_create_settings(db)
     return {
-        "detection_mode": "binary",
-        "alert_threshold": 50.0,
-        "replay_speed": 1.0,
-        "notifications_enabled": True,
-        "selected_model": "Random Forest",
-        "selected_dataset": "CIC-IDS2017",
+        "detection_mode": record.detection_mode,
+        "alert_threshold": float(record.alert_threshold),
+        "replay_speed": float(record.replay_speed),
+        "notifications_enabled": bool(record.notifications_enabled),
+        "selected_model": record.selected_model,
+        "selected_dataset": record.selected_dataset,
+        "updated_at": record.updated_at.isoformat() if record.updated_at else None,
     }
 
 
-@router.put("")
-async def update_settings(settings: SettingsUpdate):
-    """Update platform settings."""
-    return {"status": "updated", "settings": settings.model_dump(exclude_none=True)}
+@router.put("", response_model=Dict[str, Any])
+async def update_settings_endpoint(
+    payload: SettingsUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update and persist platform settings."""
+    record = await update_settings(db, payload)
+    return {
+        "status": "updated",
+        "settings": {
+            "detection_mode": record.detection_mode,
+            "alert_threshold": float(record.alert_threshold),
+            "replay_speed": float(record.replay_speed),
+            "notifications_enabled": bool(record.notifications_enabled),
+            "selected_model": record.selected_model,
+            "selected_dataset": record.selected_dataset,
+            "updated_at": record.updated_at.isoformat() if record.updated_at else None,
+        },
+    }

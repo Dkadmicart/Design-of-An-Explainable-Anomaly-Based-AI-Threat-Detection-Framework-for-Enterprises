@@ -1,12 +1,53 @@
 """Events API routes."""
 from fastapi import APIRouter, Query, Depends, HTTPException
-from typing import Optional
+from typing import Optional, Dict, Any
+from datetime import timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.database.session import get_db
 from app.models.database import Event
 
 router = APIRouter()
+
+
+def format_event_response(e: Event) -> Dict[str, Any]:
+    """Serialize Event model to dictionary with explicit UTC ISO timestamps."""
+    ts = e.timestamp
+    if ts is not None and ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    ts_str = ts.isoformat() if ts else None
+
+    cat = e.created_at
+    if cat is not None and cat.tzinfo is None:
+        cat = cat.replace(tzinfo=timezone.utc)
+    cat_str = cat.isoformat() if cat else None
+
+    return {
+        "id": e.id,
+        "timestamp": ts_str,
+        "source_ip": e.source_ip,
+        "destination_ip": e.destination_ip,
+        "source_port": e.source_port,
+        "destination_port": e.destination_port,
+        "protocol": e.protocol,
+        "flow_duration": e.flow_duration,
+        "total_fwd_packets": e.total_fwd_packets,
+        "total_bwd_packets": e.total_bwd_packets,
+        "total_length_fwd_packets": e.total_length_fwd_packets,
+        "total_length_bwd_packets": e.total_length_bwd_packets,
+        "flow_bytes_per_sec": e.flow_bytes_per_sec,
+        "flow_packets_per_sec": e.flow_packets_per_sec,
+        "features": e.features,
+        "prediction": e.prediction,
+        "confidence": e.confidence,
+        "anomaly_score": e.anomaly_score,
+        "risk_score": e.risk_score,
+        "attack_type": e.attack_type,
+        "model_version": e.model_version,
+        "model_name": e.model_name,
+        "dataset_source": e.dataset_source,
+        "created_at": cat_str,
+    }
 
 
 @router.get("")
@@ -44,7 +85,7 @@ async def list_events(
     events = events_res.scalars().all()
 
     return {
-        "events": events,
+        "events": [format_event_response(e) for e in events],
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -58,4 +99,4 @@ async def get_event(event_id: str, db: AsyncSession = Depends(get_db)):
     event = res.scalar_one_or_none()
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    return {"event": event}
+    return {"event": format_event_response(event)}

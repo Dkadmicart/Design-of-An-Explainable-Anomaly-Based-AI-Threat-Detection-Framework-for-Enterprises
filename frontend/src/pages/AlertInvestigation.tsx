@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, AlertTriangle, Clock, Shield, Globe,
   ExternalLink, MessageSquare, CheckCircle, XCircle,
-  Activity, Info, RefreshCw, Zap
+  Activity, Info, RefreshCw, Zap, Target
 } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '../services/api';
-import type { Alert, MitreTechnique, NetworkEvent, ModelExplainResponse } from '../types';
+import type { Alert, MitreTechnique, MitreTelemetrySummary, NetworkEvent, ModelExplainResponse } from '../types';
+import { formatMitreTelemetry, EVIDENCE_REQUIREMENTS } from '../services/mitreAttribution';
 import { ShapWaterfall, type ShapFeature } from '../components/landing/ShapWaterfall';
 import { PageContainer, PageHeader } from '../components/common/PageContainer';
 import { Card } from '../components/common/Card';
@@ -94,8 +95,11 @@ export default function AlertInvestigationPage() {
   const [newNote, setNewNote] = useState('');
   const [alertStatus, setAlertStatus] = useState('NEW');
   const [alert, setAlert] = useState<Alert | null>(null);
+  const [alertLoading, setAlertLoading] = useState(true);
   const [linkedEvent, setLinkedEvent] = useState<NetworkEvent | null>(null);
   const [mitreTechniques, setMitreTechniques] = useState<MitreTechnique[]>([]);
+  const [mitreSummary, setMitreSummary] = useState<MitreTelemetrySummary | null>(null);
+  const [mitreLoading, setMitreLoading] = useState(true);
   const [relatedEvents, setRelatedEvents] = useState<NetworkEvent[]>([]);
 
   // TreeSHAP Explanation States
@@ -124,6 +128,7 @@ export default function AlertInvestigationPage() {
 
   useEffect(() => {
     if (alertId) {
+      setAlertLoading(true);
       api.getAlert(alertId).then(async (res) => {
         if (res.alert) {
           setAlert(res.alert);
@@ -149,9 +154,25 @@ export default function AlertInvestigationPage() {
           // If raw flow features were not captured on event, prompt analyst
           setFeaturesSource('none');
         }
-      }).catch(console.error);
+      })
+      .catch(console.error)
+      .finally(() => {
+        setAlertLoading(false);
+      });
     }
-    api.getMitreTechniques().then(res => setMitreTechniques(res.techniques)).catch(console.error);
+    api.getMitreTechniques()
+      .then(res => {
+        setMitreTechniques(res.techniques || []);
+        if (res.summary) {
+          setMitreSummary(res.summary);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load MITRE techniques & telemetry:', err);
+      })
+      .finally(() => {
+        setMitreLoading(false);
+      });
     api.getEvents({ page_size: 6 }).then(res => setRelatedEvents(res.events)).catch(console.error);
   }, [alertId, runExplanation]);
 
@@ -175,12 +196,33 @@ export default function AlertInvestigationPage() {
   };
 
   const handleAction = async (action: string) => {
-    setAlertStatus(action);
-    if (alertId) {
-      if (action === 'RESOLVED') await api.resolveAlert(alertId, newNote);
-      else if (action === 'ESCALATED') await api.escalateAlert(alertId, newNote);
-      else if (action === 'CONFIRMED') await api.confirmAlert(alertId, newNote);
-      else if (action === 'BENIGN') await api.markBenignAlert(alertId, newNote);
+    if (!alertId) return;
+    try {
+      if (action === 'RESOLVED') {
+        await api.resolveAlert(alertId, newNote);
+        setAlertStatus('RESOLVED');
+      } else if (action === 'ESCALATED') {
+        await api.escalateAlert(alertId, newNote);
+        setAlertStatus('ESCALATED');
+      } else if (action === 'CONFIRMED') {
+        await api.confirmAlert(alertId, newNote);
+        setAlertStatus('CONFIRMED');
+      } else if (action === 'INVESTIGATING') {
+        await api.investigateAlert(alertId, newNote);
+        setAlertStatus('INVESTIGATING');
+      } else if (action === 'FALSE_POSITIVE' || action === 'BENIGN') {
+        await api.markBenignAlert(alertId, newNote);
+        setAlertStatus('BENIGN');
+      }
+      if (alert) {
+        setAlert({ ...alert, status: (action === 'FALSE_POSITIVE' ? 'BENIGN' : action) as any });
+      }
+      if (newNote.trim()) {
+        setNotes((prev) => [...prev, { content: newNote, time: new Date().toISOString() }]);
+        setNewNote('');
+      }
+    } catch (err) {
+      console.error('Failed to update alert action:', err);
     }
   };
 
@@ -194,6 +236,17 @@ export default function AlertInvestigationPage() {
       percentage: c.percentage,
     }));
   }, [explanation]);
+
+  if (alertLoading) {
+    return (
+      <PageContainer>
+        <div className="flex flex-col items-center justify-center p-24 space-y-3">
+          <RefreshCw size={28} className="animate-spin text-amber-500" />
+          <span className="text-sm font-bold text-slate-700">Loading incident alert telemetry...</span>
+        </div>
+      </PageContainer>
+    );
+  }
 
   if (!alert) {
     return (
@@ -479,7 +532,7 @@ export default function AlertInvestigationPage() {
             ))}
           </div>
           <div className="mt-4 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-500 leading-relaxed">
-            <strong>Telemetry Origin:</strong> Derived from authentic CIC-IDS2017 statistical flow records (<code className="font-mono text-slate-700">D:\shap_sample_features.csv</code>). IP addresses are private visualization topology labels; flow durations, packet counts, and byte metrics are authentic flow attributes.
+            <strong>Telemetry Origin:</strong> Derived from authentic CIC-IDS2017 statistical flow records (<code className="font-mono text-slate-700">D:\shap_sample_features.csv</code>; 2,000-row representative sample of full dataset). IP addresses are private visualization topology labels; flow durations, packet counts, and byte metrics are authentic flow attributes.
           </div>
         </Card>
       </div>
@@ -550,26 +603,105 @@ export default function AlertInvestigationPage() {
                 </p>
               </div>
             ) : (
-              <div className="p-6 border border-dashed border-slate-200 rounded-xl text-center bg-slate-50/60 my-2 space-y-2">
-                <Shield size={24} className="mx-auto text-slate-400" />
-                <p className="text-xs font-bold text-slate-700">
-                  No Validated MITRE Technique Mapped
-                </p>
-                <p className="text-[11px] text-slate-500 max-w-sm mx-auto leading-relaxed">
-                  The detection engine uses a binary anomaly classifier (BENIGN vs ATTACK). In accordance with enterprise research integrity, MITRE ATT&CK tactics and techniques are unset unless produced by a multi-class classifier or verified threat intel.
-                </p>
+              <div className="space-y-4 my-2">
+                <div className="p-4 border border-dashed border-amber-200/80 bg-amber-50/40 rounded-xl">
+                  <div className="flex items-start gap-3">
+                    <Shield size={18} className="text-amber-600 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">
+                        No validated MITRE techniques mapped yet
+                      </p>
+                      <p className="text-[11px] text-slate-600 leading-relaxed mt-1">
+                        The detection engine operates as a binary anomaly classifier (<span className="font-semibold text-slate-700">BENIGN</span> vs <span className="font-semibold text-slate-700">ATTACK</span>). Binary anomaly detections cannot independently confirm exact MITRE techniques without multi-class labels or verified threat telemetry.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-bold text-slate-500 tracking-wider uppercase">
+                      Fleet Technique Attribution Telemetry
+                    </span>
+                    <Badge variant="neutral" className="text-[10px]">
+                      Database Live
+                    </Badge>
+                  </div>
+                  {mitreLoading ? (
+                    <div className="grid grid-cols-3 gap-2.5 animate-pulse">
+                      <div className="h-16 bg-slate-100 rounded-xl" />
+                      <div className="h-16 bg-slate-100 rounded-xl" />
+                      <div className="h-16 bg-slate-100 rounded-xl" />
+                    </div>
+                  ) : mitreSummary ? (
+                    <div className="grid grid-cols-3 gap-2.5">
+                      <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl text-center">
+                        <span className="text-[10px] font-semibold text-slate-500 block uppercase tracking-wider">
+                          Total Alerts
+                        </span>
+                        <span className="text-base font-bold text-slate-900 block mt-0.5">
+                          {formatMitreTelemetry(mitreSummary).totalAlerts}
+                        </span>
+                      </div>
+                      <div className="p-3 bg-blue-50/50 border border-blue-200/70 rounded-xl text-center">
+                        <span className="text-[10px] font-semibold text-blue-600 block uppercase tracking-wider">
+                          Mapped Alerts
+                        </span>
+                        <span className="text-base font-bold text-blue-700 block mt-0.5">
+                          {formatMitreTelemetry(mitreSummary).mappedAlerts}
+                        </span>
+                      </div>
+                      <div className="p-3 bg-amber-50/50 border border-amber-200/70 rounded-xl text-center">
+                        <span className="text-[10px] font-semibold text-amber-700 block uppercase tracking-wider">
+                          Unmapped / Insufficient
+                        </span>
+                        <span className="text-base font-bold text-amber-800 block mt-0.5">
+                          {formatMitreTelemetry(mitreSummary).unmappedAlerts}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-500">
+                      Telemetry data currently unavailable from backend service.
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3 bg-slate-50/80 border border-slate-200/80 rounded-xl">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <Info size={13} className="text-slate-500" />
+                    <span className="text-[11px] font-bold text-slate-700">
+                      Evidence required for attribution:
+                    </span>
+                  </div>
+                  <ul className="space-y-1">
+                    {EVIDENCE_REQUIREMENTS.map((item, idx) => (
+                      <li key={idx} className="flex items-center gap-2 text-[11px] text-slate-600">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             )}
           </div>
-          {mitre?.url && (
+          {mitre?.url ? (
             <a
               href={mitre.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn btn-secondary btn-sm w-full mt-4"
+              className="btn btn-secondary btn-sm w-full mt-4 flex items-center justify-center gap-2"
             >
               <ExternalLink size={14} /> Open Technique Specification on MITRE ATT&CK
             </a>
+          ) : (
+            <Link
+              to="/mitre"
+              className="btn btn-secondary btn-sm w-full mt-4 flex items-center justify-center gap-2"
+            >
+              <Target size={14} /> Browse MITRE ATT&CK Matrix & Coverage
+            </Link>
           )}
         </Card>
 

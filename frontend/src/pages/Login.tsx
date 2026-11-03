@@ -29,13 +29,18 @@ export default function LoginPage() {
   const { login } = useAuth();
   const { theme, toggleTheme, isLight } = useTheme();
 
+  const locationState = location.state as any;
+  const initialEmail = locationState?.registeredEmail || '';
+  const initialSuccess = locationState?.message || locationState?.successMessage || null;
+
   // Manual Form State
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [authActionText, setAuthActionText] = useState('Signing in...');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(initialSuccess);
   const [activeAccountFill, setActiveAccountFill] = useState<'admin' | 'analyst' | null>(null);
 
   const destination = (location.state as any)?.from?.pathname || '/dashboard';
@@ -46,6 +51,7 @@ export default function LoginPage() {
     if (isLoading) return;
 
     setErrorMessage(null);
+    setSuccessMessage(null);
 
     const validation = validateWorkEmail(email);
     if (!validation.isValid) {
@@ -73,6 +79,7 @@ export default function LoginPage() {
     setEmail(creds.email);
     setPassword(creds.password);
     setErrorMessage(null);
+    setSuccessMessage(null);
   };
 
   const clearForm = () => {
@@ -204,6 +211,14 @@ export default function LoginPage() {
 
         {/* ━━━━ PRIMARY AUTHENTICATION CARD ━━━━ */}
         <div className="auth-card space-y-5">
+          {/* Success Message Alert */}
+          {successMessage && (
+            <div data-testid="login-success-message" className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs font-semibold flex items-start gap-2.5 animate-fade-in">
+              <Check size={16} className="text-emerald-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 leading-relaxed">{successMessage}</div>
+            </div>
+          )}
+
           {/* Error Message Alert */}
           {errorMessage && (
             <div data-testid="login-error-message" className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-semibold flex items-start gap-2.5 animate-fade-in">

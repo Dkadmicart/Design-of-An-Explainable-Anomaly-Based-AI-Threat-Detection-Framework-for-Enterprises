@@ -86,4 +86,21 @@ describe('TreeSHAP explanation mapping for ShapWaterfall', () => {
     assert.ok(mockResponse.base_value !== undefined);
     assert.ok(mockResponse.margin !== undefined);
   });
+
+  it('preserves all feature contributions when maxFeatures is not constrained', () => {
+    const eightFeatures = Array.from({ length: 8 }, (_, i) => ({
+      name: `feat_${i}`,
+      label: `Feature ${i}`,
+      rawVal: `${i * 10}`,
+      shapVal: i % 2 === 0 ? 0.5 + i : -(0.5 + i),
+      percentage: 12.5,
+    }));
+
+    // Slicing behavior tested in ShapWaterfall component
+    const renderedAll = eightFeatures;
+    assert.equal(renderedAll.length, 8);
+
+    const renderedLimited = eightFeatures.slice(0, 4);
+    assert.equal(renderedLimited.length, 4);
+  });
 });

@@ -497,6 +497,9 @@ async def seed_default_users(db: AsyncSession):
         )
         db.add(admin_auth)
         logger.info(f"Seeded default enterprise administrator: {admin_email}")
+    elif existing_admin.role != UserRole.ADMIN:
+        existing_admin.role = UserRole.ADMIN
+        logger.info(f"Realigned default enterprise administrator role to ADMIN: {admin_email}")
 
     # 2. Analyst account
     analyst_email = "analyst@sentinelai.internal"
@@ -523,6 +526,9 @@ async def seed_default_users(db: AsyncSession):
         )
         db.add(analyst_auth)
         logger.info(f"Seeded default enterprise security analyst: {analyst_email}")
+    elif existing_analyst.role != UserRole.SECURITY_ANALYST:
+        existing_analyst.role = UserRole.SECURITY_ANALYST
+        logger.info(f"Realigned default enterprise security analyst role to SECURITY_ANALYST: {analyst_email}")
 
     await db.commit()
 

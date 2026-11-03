@@ -21,9 +21,11 @@ logger = logging.getLogger("sentinelai.api.models")
 router = APIRouter()
 
 EXPLANATION_DISCLAIMER = (
-    "Feature contributions are additive log-odds values calculated via TreeSHAP for tree ensembles. "
-    "Positive values push the model toward predicting an anomaly/attack; negative values push toward "
-    "benign traffic. They reflect feature influence on the model margin, not probabilities or causal explanations."
+    "Feature contributions are additive log-odds values calculated via exact path-dependent TreeSHAP "
+    "from XGBoost tree cover weights. Positive values push the model toward predicting an anomaly/attack; "
+    "negative values push toward benign traffic. They reflect feature influence on the model margin, "
+    "not probabilities or causal explanations. Telemetry reference baselines and offline replay samples "
+    "derive from a 2,000-row representative sample of the full CIC-IDS2017 dataset, not a validation-only holdout."
 )
 
 

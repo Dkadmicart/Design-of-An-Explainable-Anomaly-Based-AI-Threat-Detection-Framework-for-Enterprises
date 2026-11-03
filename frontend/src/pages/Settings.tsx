@@ -24,10 +24,12 @@ export default function SettingsPage() {
     alert_threshold: 50.0,
     replay_speed: 1.0,
     notifications_enabled: true,
-    selected_model: 'Random Forest Baseline',
+    selected_model: 'XGBoost Grouped Classifier',
     selected_dataset: 'CIC-IDS2017 Benchmark',
   });
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [activeReplayFile, setActiveReplayFile] = useState<string | null>(null);
 
   // User Management State (Admin only)
   const [users, setUsers] = useState<User[]>([]);
@@ -44,6 +46,11 @@ export default function SettingsPage() {
 
   useEffect(() => {
     api.getSettings().then(setSettings).catch(console.error);
+    api.getReplayStatus().then((st: any) => {
+      if (st?.current_file) {
+        setActiveReplayFile(st.current_file);
+      }
+    }).catch(() => {});
   }, []);
 
   const loadUserData = async () => {
@@ -70,9 +77,19 @@ export default function SettingsPage() {
   }, [activeTab, isAdmin]);
 
   const handleSavePreferences = async () => {
-    await api.updateSettings(settings).catch(console.error);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    setSaveError(null);
+    try {
+      const res = await api.updateSettings(settings);
+      if (res?.settings) {
+        setSettings(prev => ({ ...prev, ...res.settings }));
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err: any) {
+      console.error('Failed to save preferences:', err);
+      setSaveError(err.message || 'Failed to save configuration settings');
+      setTimeout(() => setSaveError(null), 4000);
+    }
   };
 
   const handleInviteUser = async (e: React.FormEvent) => {
@@ -187,8 +204,13 @@ export default function SettingsPage() {
       {activeTab === 'preferences' && (
         <div className="space-y-6">
           {saved && (
-            <div className="p-4 rounded-xl bg-emerald-50 text-emerald-800 text-sm font-bold flex items-center gap-2 border border-emerald-200 animate-fade-in shadow-2xs">
+            <div data-testid="settings-save-success" className="p-4 rounded-xl bg-emerald-50 text-emerald-800 text-sm font-bold flex items-center gap-2 border border-emerald-200 animate-fade-in shadow-2xs">
               <Check size={18} className="text-emerald-600" /> Platform settings saved successfully.
+            </div>
+          )}
+          {saveError && (
+            <div data-testid="settings-save-error" className="p-4 rounded-xl bg-red-50 text-red-800 text-sm font-bold flex items-center gap-2 border border-red-200 animate-fade-in shadow-2xs">
+              <AlertCircle size={18} className="text-red-600" /> {saveError}
             </div>
           )}
 
@@ -205,27 +227,43 @@ export default function SettingsPage() {
                   Classification Architecture
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
-                  {[
-                    { id: 'binary', title: 'Binary Detection Mode', desc: 'Classifies traffic strictly into BENIGN vs ATTACK' },
-                    { id: 'multiclass', title: 'Multiclass Detection Mode', desc: 'Classifies traffic into explicit attack types (DDoS, DoS, PortScan, etc.)' },
-                  ].map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setSettings(s => ({ ...s, detection_mode: m.id as 'binary' | 'multiclass' }))}
-                      className={clsx(
-                        'p-4 sm:p-5 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between min-w-0 overflow-hidden',
-                        settings.detection_mode === m.id
-                          ? 'bg-amber-500/10 border-amber-400 ring-2 ring-amber-400/20 font-bold'
-                          : 'border-slate-200 hover:bg-slate-50'
-                      )}
-                    >
-                      <div className="min-w-0">
-                        <div className="font-extrabold text-sm text-slate-900 mb-1 break-words whitespace-normal">{m.title}</div>
-                        <div className="text-xs text-slate-500 font-medium leading-relaxed break-words whitespace-normal">{m.desc}</div>
+                  {/* Binary Detection Mode - Active */}
+                  <button
+                    type="button"
+                    onClick={() => setSettings(s => ({ ...s, detection_mode: 'binary' }))}
+                    className={clsx(
+                      'p-4 sm:p-5 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between min-w-0 overflow-hidden',
+                      settings.detection_mode === 'binary'
+                        ? 'bg-amber-500/10 border-amber-400 ring-2 ring-amber-400/20 font-bold'
+                        : 'border-slate-200 hover:bg-slate-50'
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="font-extrabold text-sm text-slate-900 break-words">Binary Detection Mode</div>
+                        <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">Active Engine</span>
                       </div>
-                    </button>
-                  ))}
+                      <div className="text-xs text-slate-500 font-medium leading-relaxed break-words whitespace-normal">
+                        Classifies traffic strictly into BENIGN vs ATTACK using the verified 69-feature XGBoost classifier.
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Multiclass Detection Mode - Explicitly Disabled & Labeled */}
+                  <div
+                    className="p-4 sm:p-5 rounded-xl text-left border border-slate-200 bg-slate-50/70 opacity-60 cursor-not-allowed flex flex-col justify-between min-w-0 overflow-hidden select-none"
+                    title="Not available: multiclass model not configured."
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="font-bold text-sm text-slate-500 break-words">Multiclass Detection Mode</div>
+                        <span className="text-[10px] font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded">Not Available</span>
+                      </div>
+                      <div className="text-xs text-slate-400 font-medium leading-relaxed break-words whitespace-normal">
+                        Not available: multiclass model not configured. The current pipeline operates strictly on the binary XGBoost intrusion detector.
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -250,6 +288,9 @@ export default function SettingsPage() {
                   <span className="truncate pr-2">Low (Higher sensitivity)</span>
                   <span className="truncate pl-2 text-right">High (Critical focus)</span>
                 </div>
+                <div className="text-[11px] text-slate-500 font-medium mt-3 bg-slate-50 p-3 rounded-lg border border-slate-200 leading-relaxed">
+                  <strong>Alert Evaluation Rule:</strong> Alerts are triggered when <code className="bg-slate-200/80 px-1 py-0.5 rounded font-mono text-slate-800">risk_score &ge; {settings.alert_threshold} OR prediction == &quot;ATTACK&quot;</code>. All flows classified as ATTACK automatically generate alerts; adjusting this threshold controls sensitivity for flagging elevated-risk or anomalous benign flows without suppressing verified attack detections.
+                </div>
               </div>
             </div>
           </Card>
@@ -271,13 +312,16 @@ export default function SettingsPage() {
                   onChange={(e) => setSettings(s => ({ ...s, selected_model: e.target.value }))}
                   className="input select text-xs py-2.5 bg-slate-50 focus:bg-white w-full max-w-full truncate"
                 >
-                  <option value="Random Forest Baseline">Random Forest Baseline</option>
-                  <option value="XGBoost Classifier">XGBoost Classifier</option>
-                  <option value="Logistic Regression">Logistic Regression Baseline</option>
-                  <option value="Isolation Forest">Isolation Forest Anomaly Detector</option>
-                  <option value="Autoencoder">Deep Autoencoder Network</option>
-                  <option value="LSTM Sequence Classifier">LSTM Sequence Classifier</option>
+                  <option value="XGBoost Grouped Classifier">XGBoost Grouped Classifier (Active &bull; 69 Features)</option>
+                  <option value="Random Forest Baseline" disabled>Random Forest Baseline (Not trained / Unavailable)</option>
+                  <option value="Logistic Regression" disabled>Logistic Regression (Not trained / Unavailable)</option>
+                  <option value="Isolation Forest" disabled>Isolation Forest (Not trained / Unavailable)</option>
+                  <option value="Autoencoder" disabled>Deep Autoencoder (Not trained / Unavailable)</option>
+                  <option value="LSTM Sequence Classifier" disabled>LSTM Sequence Classifier (Not trained / Unavailable)</option>
                 </select>
+                <span className="text-[11px] text-slate-500 font-medium block mt-1.5">
+                  Trained supervised binary classifier loaded from <code className="bg-slate-100 px-1 py-0.5 rounded font-mono">ml/artifacts/xgboost_grouped_model.joblib</code>.
+                </span>
               </div>
 
               <div className="min-w-0">
@@ -292,7 +336,12 @@ export default function SettingsPage() {
                   <option value="CIC-IDS2017 Benchmark">Historical CIC-IDS2017 Benchmark (Dataset Replay)</option>
                 </select>
                 <span className="text-[11px] text-slate-500 font-medium block mt-1.5">
-                  Truthfully streaming historical benchmark flow telemetry from <code className="bg-slate-100 px-1 py-0.5 rounded font-mono">data/raw/cic-ids2017/</code>.
+                  Truthfully streaming historical benchmark flow telemetry from <code className="bg-slate-100 px-1 py-0.5 rounded font-mono">data/raw/cic-ids2017/</code>
+                  {activeReplayFile ? (
+                    <span className="text-amber-700 font-semibold"> (Active stream: {activeReplayFile})</span>
+                  ) : (
+                    <span> (8 validated benchmark Parquet files)</span>
+                  )}.
                 </span>
               </div>
             </div>

@@ -25,6 +25,13 @@ import {
   setCachedEvents,
   clearCachedEvents,
   formatMetricTime,
+  formatFlowDuration,
+  formatRiskScore,
+  parseUtcTimestamp,
+  formatProcessingTime,
+  formatTimelineLocalTime,
+  categorizeTimelineEvent,
+  aggregateTimelineEvents,
   type StreamMetric,
 } from './replayMetrics.ts';
 import type { NetworkEvent } from '../types.ts';
@@ -268,5 +275,155 @@ describe('Replay Stream Metrics & Chart Telemetry', () => {
     // Format metric time helper verification
     const formatted = formatMetricTime(baseEpoch);
     assert.match(formatted, /^\d{2}:\d{2}:\d{2}$/);
+  });
+
+  it('correctly formats CIC-IDS2017 Flow Duration from microseconds according to threshold rules', () => {
+    // >= 1,000,000 µs: display seconds
+    assert.equal(formatFlowDuration(105066879), '105.1s');
+    assert.equal(formatFlowDuration(5980324), '6.0s');
+    assert.equal(formatFlowDuration(1000000), '1.0s');
+
+    // >= 1,000 µs: display milliseconds
+    assert.equal(formatFlowDuration(182390), '182.4ms');
+    assert.equal(formatFlowDuration(66331), '66.3ms');
+    assert.equal(formatFlowDuration(32400), '32.4ms');
+    assert.equal(formatFlowDuration(1000), '1.0ms');
+
+    // < 1,000 µs: display microseconds
+    assert.equal(formatFlowDuration(239), '239µs');
+    assert.equal(formatFlowDuration(52), '52µs');
+    assert.equal(formatFlowDuration(0), '0µs');
+
+    // Edge cases: null, undefined, NaN
+    assert.equal(formatFlowDuration(null), '0µs');
+    assert.equal(formatFlowDuration(undefined), '0µs');
+    assert.equal(formatFlowDuration(NaN), '0µs');
+  });
+
+  it('formats risk scores on a composite 0-100 scale without percent suffix', () => {
+    // Near zero floats from benign rounding
+    assert.equal(formatRiskScore(0.0), '0.0');
+    assert.equal(formatRiskScore(0.0029999), '0.0');
+    assert.equal(formatRiskScore(0.6), '0.6');
+    assert.equal(formatRiskScore(9.0), '9.0');
+
+    // Typical attack risk scores
+    assert.equal(formatRiskScore(78.0), '78.0');
+    assert.equal(formatRiskScore(78), '78.0');
+    assert.equal(formatRiskScore(63.3), '63.3');
+
+    // Verify absence of '%' suffix
+    assert.doesNotMatch(formatRiskScore(78.0), /%/);
+    assert.doesNotMatch(formatRiskScore(0.0), /%/);
+
+    // Boundary and fallback handling
+    assert.equal(formatRiskScore(null), '0.0');
+    assert.equal(formatRiskScore(undefined), '0.0');
+    assert.equal(formatRiskScore(105.5), '100.0');
+    assert.equal(formatRiskScore(-5), '0.0');
+  });
+
+  it('safely parses UTC timestamps whether ISO string is explicit Z, offset, or naive', () => {
+    // 1. Explicit 'Z'
+    const d1 = parseUtcTimestamp('2026-10-31T19:03:04.210Z');
+    assert.equal(d1.getUTCFullYear(), 2026);
+    assert.equal(d1.getUTCHours(), 19);
+    assert.equal(d1.getUTCMinutes(), 3);
+    assert.equal(d1.getUTCSeconds(), 4);
+    assert.equal(d1.getUTCMilliseconds(), 210);
+
+    // 2. Explicit '+00:00' offset
+    const d2 = parseUtcTimestamp('2026-10-31T19:03:04.210+00:00');
+    assert.equal(d2.getTime(), d1.getTime());
+
+    // 3. Naive ISO string (no Z or offset) - must be forced to UTC
+    const d3 = parseUtcTimestamp('2026-10-31T19:03:04.210');
+    assert.equal(d3.getTime(), d1.getTime());
+
+    // 4. Fallback handling for null, undefined, Date, epoch
+    const now = new Date();
+    assert.ok(parseUtcTimestamp(null) instanceof Date);
+    assert.ok(parseUtcTimestamp(undefined) instanceof Date);
+    assert.equal(parseUtcTimestamp(now).getTime(), now.getTime());
+    assert.equal(parseUtcTimestamp(1730000000000).getTime(), 1730000000000);
+  });
+
+  it('formats replay processing time in local time with 3-digit millisecond string', () => {
+    const formatted = formatProcessingTime('2026-10-31T19:03:04.210Z');
+    assert.ok(formatted.timeStr);
+    assert.match(formatted.timeStr, /^\d{2}:\d{2}:\d{2}$/);
+    assert.equal(formatted.msStr, '210');
+
+    // Single digit ms padded with leading zeros
+    const formattedPad = formatProcessingTime('2026-10-31T19:03:04.005Z');
+    assert.equal(formattedPad.msStr, '005');
+  });
+
+  it('correctly categorizes timeline events following project thresholds', () => {
+    // Normal traffic: BENIGN flows below ALERT_RISK_THRESHOLD (50.0)
+    assert.equal(categorizeTimelineEvent({ risk_score: 0.0, prediction: 'BENIGN', attack_type: 'BENIGN' }), 'normal');
+    assert.equal(categorizeTimelineEvent({ risk_score: 5.5, prediction: 'BENIGN', attack_type: 'BENIGN' }), 'normal');
+    assert.equal(categorizeTimelineEvent({ risk_score: 49.9, prediction: 'BENIGN', attack_type: 'BENIGN' }), 'normal');
+
+    // Suspicious activity: 50.0 <= risk < 75.0 or flagged attacks below CRITICAL_RISK_THRESHOLD
+    assert.equal(categorizeTimelineEvent({ risk_score: 50.0, prediction: 'BENIGN', attack_type: 'BENIGN' }), 'suspicious');
+    assert.equal(categorizeTimelineEvent({ risk_score: 60.0, prediction: 'ATTACK', attack_type: 'DoS' }), 'suspicious');
+    assert.equal(categorizeTimelineEvent({ risk_score: 74.9, prediction: 'ATTACK', attack_type: 'PortScan' }), 'suspicious');
+    assert.equal(categorizeTimelineEvent({ risk_score: 10.0, prediction: 'ATTACK', attack_type: 'DoS' }), 'suspicious');
+
+    // Critical events: risk >= 75.0 (CRITICAL_RISK_THRESHOLD)
+    assert.equal(categorizeTimelineEvent({ risk_score: 75.0, prediction: 'ATTACK', attack_type: 'DDoS' }), 'critical');
+    assert.equal(categorizeTimelineEvent({ risk_score: 85.0, prediction: 'ATTACK', attack_type: 'DDoS' }), 'critical');
+    assert.equal(categorizeTimelineEvent({ risk_score: 100.0, prediction: 'ATTACK', attack_type: 'DDoS' }), 'critical');
+  });
+
+  it('formats timeline local time appropriately for both sub-minute and minute/hour buckets', () => {
+    // Minute/hourly bucket: HH:MM
+    const hourlyStr = formatTimelineLocalTime('2026-10-31T19:30:00.000Z', 3600);
+    assert.match(hourlyStr, /^\d{2}:\d{2}$/);
+
+    const fiveMinStr = formatTimelineLocalTime('2026-10-31T19:30:00.000Z', 300);
+    assert.match(fiveMinStr, /^\d{2}:\d{2}$/);
+
+    // Sub-minute bucket (< 60s): HH:MM:SS
+    const subMinStr = formatTimelineLocalTime('2026-10-31T19:30:15.000Z', 30);
+    assert.match(subMinStr, /^\d{2}:\d{2}:\d{2}$/);
+  });
+
+  it('aggregates events into chronological timeline buckets with honest empty state on empty input', () => {
+    // 1. Empty events array -> honest empty array (no fabrication)
+    assert.deepEqual(aggregateTimelineEvents([]), []);
+
+    // 2. Sample events spanning 2 distinct buckets with an empty bucket in between
+    const baseEpoch = 1730000000000; // t = 0
+    const mockEvents = [
+      // Bucket 0 (t = 0 to 60s): 2 Normal, 1 Critical
+      { timestamp: new Date(baseEpoch + 5000).toISOString(), risk_score: 6.0, prediction: 'BENIGN' },
+      { timestamp: new Date(baseEpoch + 15000).toISOString(), risk_score: 12.0, prediction: 'BENIGN' },
+      { timestamp: new Date(baseEpoch + 25000).toISOString(), risk_score: 80.0, prediction: 'ATTACK', attack_type: 'DDoS' },
+      // Bucket 2 (t = 120s to 180s): 1 Suspicious
+      { timestamp: new Date(baseEpoch + 130000).toISOString(), risk_score: 65.0, prediction: 'ATTACK', attack_type: 'DoS' },
+    ];
+
+    const buckets = aggregateTimelineEvents(mockEvents, 60);
+    assert.equal(buckets.length, 3); // Bucket 0, Bucket 1 (empty), Bucket 2
+
+    // Bucket 0
+    assert.equal(buckets[0].normal, 2);
+    assert.equal(buckets[0].suspicious, 0);
+    assert.equal(buckets[0].critical, 1);
+    assert.equal(buckets[0].total, 3);
+
+    // Bucket 1 (intermediate empty bucket without fabricated data)
+    assert.equal(buckets[1].normal, 0);
+    assert.equal(buckets[1].suspicious, 0);
+    assert.equal(buckets[1].critical, 0);
+    assert.equal(buckets[1].total, 0);
+
+    // Bucket 2
+    assert.equal(buckets[2].normal, 0);
+    assert.equal(buckets[2].suspicious, 1);
+    assert.equal(buckets[2].critical, 0);
+    assert.equal(buckets[2].total, 1);
   });
 });

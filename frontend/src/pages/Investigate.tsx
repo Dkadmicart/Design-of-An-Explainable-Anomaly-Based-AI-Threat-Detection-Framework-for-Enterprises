@@ -8,6 +8,7 @@ import { Card } from '../components/common/Card';
 import { EmptyState } from '../components/common/EmptyState';
 import { DataTable } from '../components/common/DataTable';
 import { Badge } from '../components/common/Badge';
+import { formatRiskScore, formatProcessingTime } from '../services/replayMetrics';
 
 export default function InvestigatePage() {
   const [targetEntity, setTargetEntity] = useState('192.168.1.105');
@@ -129,20 +130,20 @@ export default function InvestigatePage() {
           <DataTable>
             <thead>
               <tr>
-                <th>Timestamp</th>
+                <th title="Actual replay ingestion timestamp in local time (derived from server UTC processing time).">Processed At (Local)</th>
                 <th>Source IP</th>
                 <th>Destination IP</th>
                 <th>Destination Port</th>
                 <th>Protocol</th>
                 <th>Model Prediction</th>
-                <th>Risk Score</th>
+                <th>Risk Score / 100</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
               {relatedEvents.map((evt) => (
                 <tr key={evt.id} className={clsx(evt.prediction !== 'BENIGN' && 'row-suspicious')}>
-                  <td className="text-xs font-mono text-slate-500">{new Date(evt.timestamp).toLocaleTimeString()}</td>
+                  <td className="text-xs font-mono text-slate-500">{formatProcessingTime(evt.timestamp).timeStr}.{formatProcessingTime(evt.timestamp).msStr}</td>
                   <td className="text-xs font-mono font-bold text-slate-900">{evt.source_ip}</td>
                   <td className="text-xs font-mono text-slate-600">{evt.destination_ip}</td>
                   <td className="text-xs font-mono text-slate-600">{evt.destination_port}</td>
@@ -152,7 +153,7 @@ export default function InvestigatePage() {
                       {evt.prediction === 'BENIGN' ? 'Normal Traffic' : evt.attack_type}
                     </Badge>
                   </td>
-                  <td className="text-xs font-bold text-slate-900">{evt.risk_score}%</td>
+                  <td className="text-xs font-bold text-slate-900">{formatRiskScore(evt.risk_score)}</td>
                   <td>
                     <Badge variant={evt.risk_score >= 75 ? 'critical' : evt.risk_score >= 50 ? 'high' : 'low'}>
                       {evt.risk_score >= 75 ? 'CRITICAL' : evt.risk_score >= 50 ? 'HIGH' : 'LOW'}

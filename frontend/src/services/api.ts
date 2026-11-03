@@ -1,5 +1,6 @@
 import type {
-  DashboardSummary, NetworkEvent, Alert, MLModel, MitreTechnique,
+  DashboardSummary,
+  TimelinePoint, NetworkEvent, Alert, MLModel, MitreTechnique, MitreTelemetrySummary,
   Dataset, AppSettings, AttackDistribution, InvestigationResult,
   DatasetRegistry, DatasetFileRecord, DatasetSchema, DataQualityReport, LabelDistribution,
   ModelMetricsResponse, ModelFeaturesResponse, ModelPredictRequest, ModelPredictResponse,
@@ -160,6 +161,27 @@ export const api = {
     return fetchJson<DashboardSummary>('/dashboard/summary');
   },
 
+  getDashboardTimeline: async (params?: { window_hours?: number; bucket_seconds?: number }): Promise<{
+    timeline: TimelinePoint[];
+    total_events: number;
+    normal_events: number;
+    suspicious_events: number;
+    critical_events: number;
+    window_hours: number;
+    bucket_seconds: number;
+    is_replay_running: boolean;
+    is_replay_paused: boolean;
+    source_file: string | null;
+    earliest_timestamp: string | null;
+    latest_timestamp: string | null;
+  }> => {
+    const qs = new URLSearchParams();
+    if (params?.window_hours) qs.append('window_hours', params.window_hours.toString());
+    if (params?.bucket_seconds) qs.append('bucket_seconds', params.bucket_seconds.toString());
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return fetchJson(`/dashboard/timeline${query}`);
+  },
+
   // Events
   getEvents: async (params?: {
     page?: number;
@@ -206,6 +228,13 @@ export const api = {
 
   getAlert: async (id: string): Promise<{ alert: Alert }> => {
     return fetchJson<{ alert: Alert }>(`/alerts/${id}`);
+  },
+
+  investigateAlert: async (id: string, notes?: string) => {
+    return fetchJson<{ status: string; alert_id: string }>(`/alerts/${id}/investigate`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
   },
 
   resolveAlert: async (id: string, notes?: string) => {
@@ -270,8 +299,11 @@ export const api = {
   },
 
   // MITRE ATT&CK
-  getMitreTechniques: async (): Promise<{ techniques: MitreTechnique[] }> => {
-    return fetchJson<{ techniques: MitreTechnique[] }>('/mitre/techniques');
+  getMitreTechniques: async (): Promise<{
+    techniques: MitreTechnique[];
+    summary?: MitreTelemetrySummary;
+  }> => {
+    return fetchJson('/mitre/techniques');
   },
 
   // Replay
@@ -318,6 +350,7 @@ export const api = {
     speed: number;
     events_sent: number;
     total_events: number;
+    alerts_generated?: number;
     current_file: string | null;
     elapsed_seconds: number;
     worker_active?: boolean;

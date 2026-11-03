@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SentinelAI — Architectural Diagrams & Report Documentation</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #0F172A;
+      --accent: #F59E0B;
+      --bg: #F8FAFC;
+      --card-bg: #FFFFFF;
+      --border: #E2E8F0;
+      --text: #1E293B;
+      --text-muted: #64748B;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+111
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 32px 20px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 32px;
+      margin-bottom: 28px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    .badge {
+      display: inline-block;
+      background: #FEF3C7;
+      color: #92400E;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .card {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 32px;
+      margin-bottom: 28px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      background: #F1F5F9;
+      color: #0F172A;
+      border: 1px solid #CBD5E1;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease-in-out;
+    }
+
+    button:hover {
+      background: #E2E8F0;
+      border-color: #94A3B8;
+    }
+
+    button.primary {
+      background: #F59E0B;
+      color: #FFFFFF;
+      border-color: #D97706;
+    }
+
+    button.primary:hover {
+      background: #D97706;
+    }
+
+    .diagram-viewport {
+      background: #FAFAFA;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      overflow-x: auto;
+      display: flex;
+      justify-content: center;
+    }
+
+    .mermaid {
+      width: 100%;
+      text-align: center;
+    }
+
+    .section-content {
+      background: #F8FAFC;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #334155;
+      margin-top: 16px;
+    }
+
+    .section-content h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0F172A;
+      margin-bottom: 10px;
+    }
+
+    .section-content p {
+      margin-bottom: 12px;
+    }
+
+    .section-content p:last-child {
+      margin-bottom: 0;
+    }
+
+    @media print {
+      body {
+        padding: 0;
+        background: #FFFFFF;
+      }
+      .card {
+        box-shadow: none;
+        border: 1px solid #CCC;
+        page-break-inside: avoid;
+      }
+      button {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <span class="badge">Final-Year Engineering Project Documentation</span>
+      <h1>SentinelAI — Architecture & Technical Report Figures</h1>
+      <p class="subtitle">Design of An Explainable Anomaly-Based AI Threat Detection Framework for Enterprises</p>
+    </header>
+
+    <!-- FIGURE 1: ARCHITECTURAL PIPELINE -->
+    <div class="card" id="card-architecture">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Figure 1: End-to-End Threat Detection Pipeline Architecture</h2>
+          <p class="subtitle">Flow from Network Telemetry Probes through Node.js Gateway, Python ML Engine, and React Dashboard</p>
+        </div>
+        <div class="actions">
+          <button class="primary" onclick="downloadSvg('svg-architecture', 'SentinelAI_Architecture_Diagram.svg')">
+            ⬇ Download SVG
+          </button>
+          <button onclick="downloadPng('svg-architecture', 'SentinelAI_Architecture_Diagram.png')">
+            ⬇ Download PNG
+          </button>
+        </div>
+      </div>
+      <div class="diagram-viewport">
+        <div class="mermaid" id="svg-architecture">
+flowchart TD
+    subgraph S1["1. Network Telemetry Ingestion Layer"]
+        P1["Physical & Virtual Network Probes\n(SPAN / TAP, Zeek, Suricata, IPFIX)"]
+        P2["Dataset Replay Engine\n(CIC-IDS2017 Preprocessed Flow Streams)"]
+    end
+
+    subgraph S2["2. API Gateway & Ingress Layer (Node.js)"]
+        GW["Node.js API Gateway Router\n(Ingestion Endpoint & Reverse Proxy)"]
+        AUTH["Security & Rate Limiting Middleware\n(JWT Authentication & Input Sanitization)"]
+        WS_HUB["WebSocket Connection Manager\n(Active Client Registry & Broadcast Hub)"]
+    end
+
+    subgraph S3["3. AI/ML Inference & Explainability Engine (Python)"]
+        PY_API["FastAPI Inference Engine\n(Async Request Broker)"]
+        PREPROC["Feature Imputation & Alignment\n(69 CIC-IDS2017 Ordered Flow Features)"]
+        XGB["XGBoost Binary Classifier\n(Supervised Decision Tree Ensemble)"]
+        SHAP["TreeSHAP Explainer\n(Path-Dependent Marginal Log-Odds)"]
+        RISK["Deterministic RiskScorer\n(Evidence, Threat Severity, Host Context)"]
+    end
+
+    subgraph S4["4. Persistent Relational Storage Layer"]
+        DB[("Relational Database\n(PostgreSQL / SQLite via SQLAlchemy)")]
+        T_EVT["Network Events Store\n(Flow Records, IPs, Ports, Timestamps)"]
+        T_ALT["Alerts & Incidents Store\n(Severity, Risk Score, Triage Status)"]
+        T_AUD["Audit Logs & Analyst Notes\n(Lifecycle State Transitions)"]
+    end
+
+    subgraph S5["5. SOC Presentation & Investigation Layer (React)"]
+        UI["React Client Dashboard\n(TypeScript, Vite, Tailwind CSS)"]
+        LM["Live Monitor Feed\n(Real-Time Flow Ingestion)"]
+        TL["Threat Activity Timeline\n(Categorized 24-Hour Buckets)"]
+        INV["Alert Investigation Workspace\n(SHAP Feature Importance & Triage)"]
+    end
+
+    P1 -->|"Raw Network Flows"| GW
+    P2 -->|"Replayed Benchmark Flows"| GW
+
+    GW --> AUTH
+    AUTH -->|"Validated Flow Records"| PY_API
+
+    PY_API --> PREPROC
+    PREPROC --> XGB
+    XGB -->|"Class Probabilities & Margin"| RISK
+    XGB -->|"Tree Cover & Split Paths"| SHAP
+    SHAP -->|"Feature Contributions"| PY_API
+    RISK -->|"Composite Risk & Severity Band"| PY_API
+
+    PY_API -->|"Scored Inference & Explanation Payload"| AUTH
+
+    PY_API -->|"Async Write: Events & Alerts"| DB
+    DB --- T_EVT
+    DB --- T_ALT
+    DB --- T_AUD
+
+    AUTH -->|"Stream Event Enqueue"| WS_HUB
+    WS_HUB ==>|"WebSocket Broadcast (ws:// / wss://)"| UI
+    GW -.->|"REST Queries (State, Historical Analytics)"| UI
+
+    UI --> LM
+    UI --> TL
+    UI --> INV
+        </div>
+      </div>
+    </div>
+
+    <!-- FIGURE 2: EXECUTION SEQUENCE FLOW -->
+    <div class="card" id="card-sequence">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Figure 2: Event-to-Dashboard Execution Sequence Flow</h2>
+          <p class="subtitle">Step-by-step synchronous and asynchronous interactions across services</p>
+        </div>
+        <div class="actions">
+          <button class="primary" onclick="downloadSvg('svg-sequence', 'SentinelAI_Execution_Sequence.svg')">
+            ⬇ Download SVG
+          </button>
+          <button onclick="downloadPng('svg-sequence', 'SentinelAI_Execution_Sequence.png')">
+            ⬇ Download PNG
+          </button>
+        </div>
+      </div>
+      <div class="diagram-viewport">
+        <div class="mermaid" id="svg-sequence">
+sequenceDiagram
+    autonumber
+    participant Probe as Network Probe / Replay
+    participant Gateway as Node.js API Gateway
+    participant PyEngine as Python ML Engine (FastAPI)
+    participant DB as Relational Database (SQL)
+    participant Client as React SOC Dashboard
+
+    Probe->>Gateway: POST /api/telemetry/ingest (Flow Vector)
+    Gateway->>Gateway: Authenticate Token & Validate Schema
+    Gateway->>PyEngine: POST /predict (69 Numeric Features)
+    
+    activate PyEngine
+    PyEngine->>PyEngine: Median Imputation & Alignment
+    PyEngine->>PyEngine: XGBoost Inference (P(ATTACK), Decision Margin)
+    PyEngine->>PyEngine: TreeSHAP (Additive Log-Odds Attribution)
+    PyEngine->>PyEngine: RiskScorer (Evidence + Severity + Context)
+    
+    PyEngine->>DB: INSERT into network_events & alerts
+    DB-->>PyEngine: Commit Acknowledged (Event ID, Alert ID)
+    
+    PyEngine-->>Gateway: Response (Prediction, Risk Score, Severity, SHAP)
+    deactivate PyEngine
+
+    Gateway->>Gateway: Format WebSocket Broadcast Payload
+    Gateway-->>Client: WS Broadcast: EVENT_PROCESSED / THREAT_ALERT
+    
+    activate Client
+    Client->>Client: Append to Live Monitor Stream
+    Client->>Client: Update Threat Timeline & KPIs
+    Client->>Client: Re-render Investigation Views
+    deactivate Client
+        </div>
+      </div>
+    </div>
+
+    <!-- REPORT SECTIONS 6.2 AND 6.3 CONTENT -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">Report Text: Sections 6.2 and 6.3</h2>
+          <p class="subtitle">Ready-to-paste formal academic text (Under 400 words)</p>
+        </div>
+        <div class="actions">
+          <button onclick="copyReportText()">📋 Copy Text</button>
+        </div>
+      </div>
+
+      <div class="section-content" id="report-text">
+        <h3>6.2 Results & Outputs</h3>
+        <p>The framework ingests network flow telemetry preprocessed from the CIC-IDS2017 benchmark using median imputation across 69 ordered numeric statistical features. The trained XGBoost binary classifier evaluates flows into <code>BENIGN</code> or <code>ATTACK</code> classes via a <code>binary:logistic</code> loss objective. For each flow, the model outputs class probabilities, an anomaly score (<em>P</em>(ATTACK)), decision margin (<em>m</em>), and prediction confidence. These feed a deterministic <code>RiskScorer</code> service that computes a composite 0–100 risk score combining temperature-calibrated margin evidence (weight: 0.50), threat severity (0.35), and host context (0.15), categorized into four severity bands: Low (0–24.9), Medium (25–49.9), High (50–74.9), and Critical (75–100).</p>
+        <p>Explainability is realized through native XGBoost TreeSHAP, generating 69 additive feature contributions and one base bias on the raw log-odds margin scale. Flows triggering <code>prediction == "ATTACK"</code> or <code>risk_score >= 50.0</code> automatically generate alerts linked 1:1 to persisted events. The platform surfaces real-time SOC dashboard telemetry, dataset replay stream monitoring, analyst triage lifecycles (<code>NEW</code>, <code>INVESTIGATING</code>, <code>CONFIRMED</code>, <code>BENIGN</code>, <code>RESOLVED</code>), and evidence-based MITRE ATT&CK attribution, designating alerts as unmapped when specific multi-class signatures are absent.</p>
+
+        <h3 style="margin-top: 20px;">6.3 Performance Analysis</h3>
+        <p>On the 15% unseen test evaluation split of CIC-IDS2017, the XGBoost model achieved verified metrics: precision of 0.994 (99.4%), recall of 0.991 (99.1%), F1-score of 0.992 (99.2%), and ROC-AUC of 0.998 (99.8%). Overall accuracy, PR-AUC, exact confusion matrix tallies, and empirical false-positive/false-negative counts on the complete holdout were <strong>Not measured</strong>. Systematic end-to-end inference latency is also <strong>Not measured</strong>, though preliminary single-flow scoring executes in &lt; 2.5 ms.</p>
+        <p>Pipeline reliability was validated through automated test suites and database audits. Backend test suites verified full execution across 28 unit and integration tests (<code>pytest</code>), while frontend services passed 44 unit tests (<code>node --test</code>) with zero linter errors (<code>oxlint</code>) and clean compilation. Database integrity audits confirmed 100% event-alert relational linkage (2,368/2,368 alerts matched to valid source events) with zero orphaned records and zero duplicate emissions across replay pause, resume, and EOF transitions.</p>
+        <p>Key research and deployment limitations must be noted:<br>
+        1. Binary abstraction restricts predictions to <code>BENIGN</code> versus <code>ATTACK</code>, preventing exact multi-class categorization or confirmed MITRE technique mapping without secondary DPI evidence.<br>
+        2. Training and replay baselines rely on random sampling from CIC-IDS2017 rather than full temporal splits.<br>
+        3. The framework lacks cross-dataset validation on external corpora (e.g., UNSW-NB15) or live enterprise traffic, leaving out-of-distribution generalization unverified.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'neutral',
+      themeVariables: {
+        fontFamily: 'Inter, sans-serif',
+        fontSize: '13px',
+        primaryColor: '#FFFFFF',
+        primaryBorderColor: '#0F172A',
+        lineColor: '#475569'
+      }
+    });
+
+    function downloadSvg(containerId, filename) {
+      const container = document.getElementById(containerId);
+      const svg = container.querySelector('svg');
+      if (!svg) {
+        alert('Diagram is rendering, please try again in a moment.');
+        return;
+      }
+      const svgData = new XMLSerializer().serializeToString(svg);
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const svgUrl = URL.createObjectURL(svgBlob);
+      const downloadLink = document.createElement('a');
+      downloadLink.href = svgUrl;
+      downloadLink.download = filename;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      URL.revokeObjectURL(svgUrl);
+    }
+
+    function downloadPng(containerId, filename) {
+      const container = document.getElementById(containerId);
+      const svg = container.querySelector('svg');
+      if (!svg) {
+        alert('Diagram is rendering, please try again in a moment.');
+        return;
+      }
+      const svgData = new XMLSerializer().serializeToString(svg);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+      
+      img.onload = function() {
+        const bbox = svg.getBoundingClientRect();
+        const scale = 2; // high resolution 2x
+        canvas.width = (bbox.width || 1000) * scale;
+        canvas.height = (bbox.height || 600) * scale;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.scale(scale, scale);
+        ctx.drawImage(img, 0, 0);
+        
+        const pngUrl = canvas.toDataURL('image/png');
+        const downloadLink = document.createElement('a');
+        downloadLink.href = pngUrl;
+        downloadLink.download = filename;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    }
+
+    function copyReportText() {
+      const textElem = document.getElementById('report-text');
+      navigator.clipboard.writeText(textElem.innerText).then(() => {
+        alert('Report Sections 6.2 and 6.3 copied to clipboard!');
+      });
+    }
+  </script>
+</body>
+</html>
+

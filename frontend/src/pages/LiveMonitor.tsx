@@ -16,6 +16,10 @@ import {
   setCachedEvents,
   clearCachedEvents,
   formatMetricTime,
+  formatFlowDuration,
+  formatRiskScore,
+  parseUtcTimestamp,
+  formatProcessingTime,
   type StreamMetric,
 } from '../services/replayMetrics';
 import { PageContainer, PageHeader } from '../components/common/PageContainer';
@@ -112,7 +116,7 @@ export default function LiveMonitorPage() {
 
   useEffect(() => {
     api.getDatasets().then(res => {
-      if (res.datasets.length > 0 && res.datasets[0].files.length > 0) {
+      if (res?.datasets?.length && res.datasets[0]?.files?.length) {
         setDatasetFiles(res.datasets[0].files);
         setSelectedFile(res.datasets[0].files[0].name);
       }
@@ -124,10 +128,15 @@ export default function LiveMonitorPage() {
     let isMounted = true;
     api.getReplayStatus().then((status) => {
       if (!isMounted) return;
-      if (status && status.is_running) {
-        setIsStreaming(true);
-        setIsPaused(status.is_paused);
-        setTotalEvents(status.events_sent);
+      if (status) {
+        if (status.is_running) {
+          setIsStreaming(true);
+          setIsPaused(status.is_paused);
+        }
+        setTotalEvents(status.events_sent || 0);
+        if (status.alerts_generated !== undefined) {
+          setTotalThreats(status.alerts_generated);
+        }
         if (status.speed) setSpeed(status.speed);
         if (status.current_file) setSelectedFile(status.current_file);
 
@@ -200,11 +209,18 @@ export default function LiveMonitorPage() {
           const statusRes = await api.getReplayStatus();
           if (statusRes && !statusRes.is_running && !statusRes.is_paused) {
             setIsStreaming(false);
+            setTotalEvents(statusRes.events_sent);
+            if (statusRes.alerts_generated !== undefined) {
+              setTotalThreats(statusRes.alerts_generated);
+            }
             setTestSuccessNotice('Dataset replay completed.');
             return;
           }
           if (statusRes) {
             setTotalEvents(statusRes.events_sent);
+            if (statusRes.alerts_generated !== undefined) {
+              setTotalThreats(statusRes.alerts_generated);
+            }
             setIsPaused(statusRes.is_paused);
             if (statusRes.metrics && statusRes.metrics.length > 0) {
               const backendMetrics: StreamMetric[] = statusRes.metrics.map((m) => ({
@@ -240,7 +256,7 @@ export default function LiveMonitorPage() {
 
               // Calculate genuine threats and throughput from authentic arrivals (no Math.random)
               const newThreats = trulyNew.filter((e) => e.prediction && e.prediction !== 'BENIGN').length;
-              setTotalThreats((t) => t + newThreats);
+              setTotalThreats((t) => (statusRes?.alerts_generated !== undefined ? statusRes.alerts_generated : t + newThreats));
 
               const updatedEvents = [...trulyNew, ...prev].slice(0, 100);
               setCachedEvents(updatedEvents);
@@ -293,10 +309,18 @@ export default function LiveMonitorPage() {
     setTotalEvents(0);
     setTotalThreats(0);
     try {
-      await api.startReplay({ speed, dataset_file: selectedFile, batch_size: 10, loop: false });
+      const res = await api.startReplay({ speed, dataset_file: selectedFile, batch_size: 10, loop: false });
       const statusRes = await api.getReplayStatus();
       if (statusRes) {
         setTotalEvents(statusRes.events_sent);
+        if (statusRes.alerts_generated !== undefined) {
+          setTotalThreats(statusRes.alerts_generated);
+        }
+      } else if (res && res.events_ingested !== undefined) {
+        setTotalEvents(res.events_ingested);
+        if (res.alerts_generated !== undefined) {
+          setTotalThreats(res.alerts_generated);
+        }
       }
     } catch (err) {
       console.error('Failed to trigger backend replay ingestion:', err);
@@ -322,6 +346,8 @@ export default function LiveMonitorPage() {
     setIsPaused(false);
     try {
       await api.stopReplay();
+      setTotalEvents(0);
+      setTotalThreats(0);
     } catch (err) {
       console.error('Failed to stop backend replay:', err);
     }
@@ -724,7 +750,7 @@ export default function LiveMonitorPage() {
           <DataTable>
             <thead>
               <tr>
-                <th>Timestamp</th>
+                <th title="Actual replay ingestion timestamp in local time (derived from server UTC processing time). The source CIC-IDS2017 dataset does not contain original network capture timestamps.">Processed At (Local)</th>
                 <th>Source IP</th>
                 <th>Destination IP</th>
                 <th>Port</th>
@@ -732,7 +758,7 @@ export default function LiveMonitorPage() {
                 <th>Duration</th>
                 <th>Packets / Bytes</th>
                 <th>Prediction</th>
-                <th>Risk Score</th>
+                <th>Risk Score / 100</th>
                 <th>Inference Status</th>
               </tr>
             </thead>
@@ -745,9 +771,12 @@ export default function LiveMonitorPage() {
                     evt.prediction !== 'BENIGN' && 'row-suspicious'
                   )}
                 >
-                  <td className="text-xs text-slate-500 whitespace-nowrap font-mono">
-                    {new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    <span className="text-[10px] text-slate-400">.{String(new Date(evt.timestamp).getMilliseconds()).padStart(3, '0')}</span>
+                  <td
+                    className="text-xs text-slate-500 whitespace-nowrap font-mono"
+                    title={`UTC Processing Time: ${parseUtcTimestamp(evt.timestamp).toISOString()} (Replay Ingestion)`}
+                  >
+                    {formatProcessingTime(evt.timestamp).timeStr}
+                    <span className="text-[10px] text-slate-400">.{formatProcessingTime(evt.timestamp).msStr}</span>
                   </td>
                   <td className="text-xs font-mono font-bold text-slate-900">{evt.source_ip}</td>
                   <td className="text-xs font-mono">{evt.destination_ip}</td>
@@ -755,7 +784,7 @@ export default function LiveMonitorPage() {
                     {evt.source_port} → {evt.destination_port}
                   </td>
                   <td className="text-xs font-bold">{evt.protocol}</td>
-                  <td className="text-xs font-mono">{(evt.flow_duration / 1000).toFixed(1)}s</td>
+                  <td className="text-xs font-mono">{formatFlowDuration(evt.flow_duration)}</td>
                   <td className="text-xs text-slate-600">
                     {evt.total_fwd_packets + evt.total_bwd_packets} pkts ({((evt.total_length_fwd_packets + evt.total_length_bwd_packets) / 1024).toFixed(1)} KB)
                   </td>
@@ -772,7 +801,7 @@ export default function LiveMonitorPage() {
                       evt.risk_score >= 25 ? 'bg-yellow-50 text-amber-800' :
                       'text-slate-600'
                     )}>
-                      {evt.risk_score}%
+                      {formatRiskScore(evt.risk_score)}
                     </span>
                   </td>
                   <td>

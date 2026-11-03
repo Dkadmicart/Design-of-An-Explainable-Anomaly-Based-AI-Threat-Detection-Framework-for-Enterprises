@@ -148,6 +148,7 @@ def test_score_service_and_risk_scorer_consistency(detector: XGBoostDetector):
         anomaly_score=score_res["anomaly_score"],
         attack_type=score_res["attack_type"] or "BENIGN",
         historical_risk=10.0,
+        margin=score_res.get("margin"),
     )
     assert score_res["risk_score"] == pytest.approx(expected_risk, abs=0.1)
 
@@ -311,6 +312,7 @@ def test_api_explain_success(client: TestClient):
     assert len(data["feature_contributions"]) == 7
     assert "explanation_notes" in data
     assert "log-odds" in data["explanation_notes"]
+    assert "2,000-row representative sample" in data["explanation_notes"]
     assert "base_value" in data
     assert "margin" in data
 
@@ -319,3 +321,48 @@ def test_api_explain_validation_error(client: TestClient):
     """POST /api/models/explain returns 422 for invalid payload."""
     res = client.post("/api/models/explain", json={"features": {}})
     assert res.status_code == 422
+
+def test_risk_scorer_continuous_deterministic_properties():
+    """Verify RiskScorer deterministic, continuous properties across BENIGN and ATTACK."""
+    # 1. Bounded in [0.0, 100.0]
+    for m in [-20.0, -10.0, -1.0, 0.0, 1.0, 8.0, 15.0, 25.0]:
+        r_b = RiskScorer.calculate("BENIGN", 0.9, margin=m)
+        r_a = RiskScorer.calculate("ATTACK", 0.9, margin=m)
+        assert 0.0 <= r_b <= 100.0
+        assert 0.0 <= r_a <= 100.0
+
+    # 2. Strict determinism: identical inputs produce identical scores
+    assert RiskScorer.calculate("ATTACK", 0.95, margin=11.2, attack_type="DoS") == \
+           RiskScorer.calculate("ATTACK", 0.95, margin=11.2, attack_type="DoS")
+    assert RiskScorer.calculate("BENIGN", 1.0, margin=-15.3) == \
+           RiskScorer.calculate("BENIGN", 1.0, margin=-15.3)
+
+    # 3. Continuous distinct scores from different valid evidence
+    # A. ATTACK scores vary continuously based on margin and attack type (not collapsing to 78.0)
+    score_portscan = RiskScorer.calculate("ATTACK", 0.9, attack_type="PortScan", margin=5.0)
+    score_dos = RiskScorer.calculate("ATTACK", 0.9, attack_type="DoS", margin=12.0)
+    score_botnet = RiskScorer.calculate("ATTACK", 0.9, attack_type="Botnet", margin=14.0)
+    assert score_portscan < score_dos < score_botnet
+    assert score_portscan != 78.0 or score_dos != 78.0
+
+    # B. ATTACK scores with generic "ATTACK" still vary continuously across different tree margins
+    s_atk_m2 = RiskScorer.calculate("ATTACK", 0.9998, attack_type="ATTACK", margin=2.0)
+    s_atk_m8 = RiskScorer.calculate("ATTACK", 0.9998, attack_type="ATTACK", margin=8.0)
+    s_atk_m14 = RiskScorer.calculate("ATTACK", 0.9998, attack_type="ATTACK", margin=14.0)
+    assert s_atk_m2 < s_atk_m8 < s_atk_m14
+
+    # C. BENIGN scores are non-zero when supported by scoring inputs and vary continuously
+    s_benign_deep = RiskScorer.calculate("BENIGN", 1.0, margin=-16.0)
+    s_benign_mid = RiskScorer.calculate("BENIGN", 0.9, margin=-8.0)
+    s_benign_border = RiskScorer.calculate("BENIGN", 0.6, margin=-0.5)
+    assert 0.0 < s_benign_deep < s_benign_mid < s_benign_border <= 25.0
+
+    # D. Historical risk increases score deterministically
+    s_clean_host = RiskScorer.calculate("BENIGN", 1.0, margin=-10.0, historical_risk=0.0)
+    s_risky_host = RiskScorer.calculate("BENIGN", 1.0, margin=-10.0, historical_risk=50.0)
+    assert s_clean_host < s_risky_host
+
+    # 4. Safe handling of missing/invalid inputs with documented neutral defaults
+    assert 0.0 <= RiskScorer.calculate("", None, None, None, None, None) <= 100.0
+    assert 0.0 <= RiskScorer.calculate("UNKNOWN", -5.0, -10.0, "UNKNOWN_ATTACK", -20.0) <= 100.0
+    assert 0.0 <= RiskScorer.calculate("ATTACK", 1.5, 2.0, None, 150.0) <= 100.0

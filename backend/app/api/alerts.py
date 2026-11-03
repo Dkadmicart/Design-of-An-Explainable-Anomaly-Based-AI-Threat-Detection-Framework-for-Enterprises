@@ -57,14 +57,27 @@ async def get_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     return {"alert": alert}
 
 
+@router.post("/{alert_id}/investigate")
+async def investigate_alert(alert_id: str, body: AlertAction, db: AsyncSession = Depends(get_db)):
+    """Mark an alert as actively undergoing tier-2 SOC investigation."""
+    res = await db.execute(select(Alert).where(Alert.id == alert_id))
+    alert = res.scalar_one_or_none()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    alert.status = AlertStatus.INVESTIGATING
+    await db.commit()
+    return {"status": "investigating", "alert_id": alert_id}
+
+
 @router.post("/{alert_id}/resolve")
 async def resolve_alert(alert_id: str, body: AlertAction, db: AsyncSession = Depends(get_db)):
     """Mark an alert as resolved."""
     res = await db.execute(select(Alert).where(Alert.id == alert_id))
     alert = res.scalar_one_or_none()
-    if alert:
-        alert.status = AlertStatus.RESOLVED
-        await db.commit()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    alert.status = AlertStatus.RESOLVED
+    await db.commit()
     return {"status": "resolved", "alert_id": alert_id}
 
 
@@ -73,9 +86,10 @@ async def escalate_alert(alert_id: str, body: AlertAction, db: AsyncSession = De
     """Escalate an alert."""
     res = await db.execute(select(Alert).where(Alert.id == alert_id))
     alert = res.scalar_one_or_none()
-    if alert:
-        alert.status = AlertStatus.ESCALATED
-        await db.commit()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    alert.status = AlertStatus.ESCALATED
+    await db.commit()
     return {"status": "escalated", "alert_id": alert_id}
 
 
@@ -84,9 +98,10 @@ async def confirm_alert(alert_id: str, body: AlertAction, db: AsyncSession = Dep
     """Confirm an alert as a true positive."""
     res = await db.execute(select(Alert).where(Alert.id == alert_id))
     alert = res.scalar_one_or_none()
-    if alert:
-        alert.status = AlertStatus.CONFIRMED
-        await db.commit()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    alert.status = AlertStatus.CONFIRMED
+    await db.commit()
     return {"status": "confirmed", "alert_id": alert_id}
 
 
@@ -95,7 +110,8 @@ async def mark_benign(alert_id: str, body: AlertAction, db: AsyncSession = Depen
     """Mark an alert as benign (false positive)."""
     res = await db.execute(select(Alert).where(Alert.id == alert_id))
     alert = res.scalar_one_or_none()
-    if alert:
-        alert.status = AlertStatus.BENIGN
-        await db.commit()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    alert.status = AlertStatus.BENIGN
+    await db.commit()
     return {"status": "benign", "alert_id": alert_id}

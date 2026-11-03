@@ -10,7 +10,7 @@ describe('Authentication & Demo Role Regression Tests', () => {
 
     assert.equal(DEMO_CREDENTIALS.analyst.email, 'analyst@sentinelai.internal');
     assert.equal(DEMO_CREDENTIALS.analyst.password, 'SentinelAnalyst2026!');
-    assert.equal(DEMO_CREDENTIALS.analyst.role, 'ANALYST');
+    assert.equal(DEMO_CREDENTIALS.analyst.role, 'SECURITY_ANALYST');
   });
 
   it('selecting Administrator demo account replaces empty fields', () => {
@@ -57,11 +57,16 @@ describe('Authentication & Demo Role Regression Tests', () => {
     assert.equal(validateWorkEmail(noAt).isValid, false);
   });
 
-  it('accepts and normalizes valid work emails with whitespace', () => {
-    const validWithSpaces = '  admin@sentinelai.internal  ';
+  it('accepts and normalizes valid work emails with whitespace and mixed casing', () => {
+    const validWithSpaces = '  Admin@SentinelAI.Internal  ';
     const res = validateWorkEmail(validWithSpaces);
     assert.equal(res.isValid, true);
     assert.equal(res.normalized, 'admin@sentinelai.internal');
+
+    const mixedCase = 'Analyst.SecOps@Enterprise.Org';
+    const res2 = validateWorkEmail(mixedCase);
+    assert.equal(res2.isValid, true);
+    assert.equal(res2.normalized, 'analyst.secops@enterprise.org');
   });
 
   it('rejects empty or whitespace-only email submissions', () => {

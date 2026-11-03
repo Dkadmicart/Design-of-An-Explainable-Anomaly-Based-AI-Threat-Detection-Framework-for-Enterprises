@@ -34,6 +34,7 @@ class ModelPredictResponse(BaseModel):
     attack_type: Optional[str] = Field(None, description="Attack classification or None if benign.")
     model_name: str = Field(..., description="Name of the model that produced this prediction.")
     model_version: str = Field(..., description="Version of the active model.")
+    margin: Optional[float] = Field(None, description="Raw decision margin (log-odds) from booster.")
 
 
 class ModelFeatureContribution(BaseModel):

@@ -183,6 +183,14 @@ export interface MitreTechnique {
   detection_count: number;
 }
 
+export interface MitreTelemetrySummary {
+  total_alerts: number;
+  mapped_alerts: number;
+  unmapped_alerts: number;
+  classification_scope: string;
+  evidence_note: string;
+}
+
 // ─── Dashboard ──────────────────────────────────────────────────────────────
 
 export interface DashboardSummary {
@@ -191,6 +199,7 @@ export interface DashboardSummary {
   suspicious_events: number;
   critical_alerts: number;
   detection_rate: number;
+  attack_event_share?: number;
   false_positive_rate: number;
   total_events_trend: number;
   normal_events_trend: number;
@@ -205,6 +214,9 @@ export interface TimelinePoint {
   normal: number;
   suspicious: number;
   critical: number;
+  timestamp?: string;
+  epoch?: number;
+  total?: number;
 }
 
 export interface AttackDistribution {
@@ -407,4 +419,5 @@ export interface AppSettings {
   notifications_enabled: boolean;
   selected_model: string;
   selected_dataset: string;
+  updated_at?: string | null;
 }

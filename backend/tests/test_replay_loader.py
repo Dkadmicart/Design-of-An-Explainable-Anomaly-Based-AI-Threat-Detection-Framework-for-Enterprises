@@ -7,6 +7,7 @@ import os
 import json
 import asyncio
 import pytest
+from datetime import datetime, timedelta, timezone
 import pandas as pd
 from fastapi.testclient import TestClient
 from sqlalchemy import select, func
@@ -101,7 +102,7 @@ def test_replay_ingestion_and_sqlite_persistence():
             res = await service.start_replay(db=session, batch_size=10, speed=1.0)
             assert res["status"] == "started"
             assert res["events_ingested"] == 10
-            assert "shap_sample_features.csv" in res["source_file"]
+            assert any(ext in res["source_file"] for ext in [".parquet", ".csv"])
 
             # Verify records in database
             event_query = select(Event).order_by(Event.created_at.desc()).limit(10)
@@ -279,13 +280,13 @@ def test_replay_end_of_dataset_and_loop_distinction():
 
         async with async_session() as session:
             # 1. When loop=False, must stop at end of dataset
-            res_stop = await service.start_replay(db=session, batch_size=10, loop=False)
+            res_stop = await service.start_replay(db=session, batch_size=10, dataset_file=DEFAULT_CSV_PATH, loop=False)
             assert res_stop["status"] == "completed"
             assert service.is_running is False
 
             # 2. When loop=True, must wrap to 0 and advance replay_pass to 2
             service.current_index = 2000
-            res_loop = await service.start_replay(db=session, batch_size=5, loop=True)
+            res_loop = await service.start_replay(db=session, batch_size=5, dataset_file=DEFAULT_CSV_PATH, loop=True)
             assert res_loop["status"] == "started"
             assert service.replay_pass == 2
             assert "(Pass 2)" in res_loop["source_file"] or service.replay_pass == 2
@@ -376,7 +377,7 @@ def test_replay_rate_telemetry_tracking():
 
 def test_replay_rolling_window_and_zero_elapsed_handling():
     """Verify 30s rolling-window boundaries and safe zero-elapsed handling in replay loader."""
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     from app.models.database import Event
 
     async def _run():
@@ -395,7 +396,7 @@ def test_replay_rolling_window_and_zero_elapsed_handling():
             assert len(service.metrics_history) > 0
 
             # 2. Verify rolling window eviction: insert simulated old events > 30s ago
-            old_time = datetime.utcnow() - timedelta(seconds=60)
+            old_time = datetime.now(timezone.utc) - timedelta(seconds=60)
             service._rolling_events.insert(0, {
                 "id": "simulated-old-event",
                 "timestamp": old_time,
@@ -414,4 +415,112 @@ def test_replay_rolling_window_and_zero_elapsed_handling():
 
     asyncio.run(_run())
 
+def test_replay_actual_utc_processing_timestamps_and_lifecycle():
+    """Verify that replay events receive actual UTC processing timestamps, API serialization is timezone-aware, and lifecycle works cleanly."""
+    async def _run():
+        service = ReplayLoaderService()
+        async with async_session() as session:
+            before_ingest = datetime.now(timezone.utc) - timedelta(seconds=2)
+            res = await service.start_replay(db=session, batch_size=5, speed=1.0)
+            assert res["status"] == "started"
+            assert res["events_ingested"] == 5
+            after_ingest = datetime.now(timezone.utc) + timedelta(seconds=2)
+
+            # 1. Stored events in database must have actual UTC timestamps within ingestion window
+            query = select(Event).where(Event.id.in_(service.last_ingested_ids)).order_by(Event.timestamp.asc())
+            events_res = await session.execute(query)
+            db_evts = events_res.scalars().all()
+            assert len(db_evts) == 5
+
+            for db_evt in db_evts:
+                db_dt = db_evt.timestamp.replace(tzinfo=timezone.utc) if db_evt.timestamp.tzinfo is None else db_evt.timestamp
+                assert before_ingest <= db_dt <= after_ingest
+
+            # 2. Test API response serialization via /api/events/{id}
+            test_client = TestClient(app)
+            for db_evt in db_evts:
+                api_res = test_client.get(f"/api/events/{db_evt.id}")
+                assert api_res.status_code == 200
+                api_data = api_res.json()
+
+                # API timestamp must be explicit ISO format with UTC timezone
+                ts_str = api_data["event"]["timestamp"]
+                assert ts_str.endswith("Z") or "+00:00" in ts_str
+                api_dt = datetime.fromisoformat(ts_str)
+                assert before_ingest <= api_dt <= after_ingest
+
+                # Stored and API timestamps must represent the exact same UTC moment
+                db_dt = db_evt.timestamp.replace(tzinfo=timezone.utc) if db_evt.timestamp.tzinfo is None else db_evt.timestamp
+                assert abs((db_dt - api_dt).total_seconds()) < 1e-4
+
+            # 3. Test lifecycle: pause, resume, stop
+            pause_res = service.pause()
+            assert pause_res["status"] == "paused"
+            assert service.is_paused is True
+
+            resume_res = service.resume()
+            assert resume_res["status"] == "resumed"
+            assert service.is_paused is False
+
+            stop_res = await service.stop()
+            assert stop_res["status"] == "stopped"
+            assert service.is_running is False
+
+    asyncio.run(_run())
+
+
+def test_replay_status_and_counts_consistency():
+    """Verify backend status counts consistency and restart behavior across lifecycle."""
+    from app.models.database import Event, Alert
+    from sqlalchemy import select
+
+    async def _run():
+        service = ReplayLoaderService()
+        await service.stop()
+
+        status_init = service.get_status()
+        assert status_init["events_sent"] == 0
+        assert status_init["alerts_generated"] == 0
+        assert status_init["is_running"] is False
+
+        async with async_session() as session:
+            # 1. Start replay and immediately pause to freeze background worker for deterministic state
+            start_res = await service.start_replay(db=session, batch_size=10, speed=1.0)
+            service.pause()
+            assert start_res["status"] == "started"
+
+            status_active = service.get_status()
+            assert status_active["events_sent"] >= start_res["events_ingested"]
+            assert status_active["alerts_generated"] >= start_res["alerts_generated"]
+            assert status_active["is_paused"] is True
+
+            # Verify against database persisted records for the last batch
+            event_res = await session.execute(
+                select(Event).where(Event.id.in_(service.last_ingested_ids))
+            )
+            events = event_res.scalars().all()
+            assert len(events) == len(service.last_ingested_ids)
+
+            # While paused, no additional events should be ingested
+            frozen_sent = status_active["events_sent"]
+            frozen_alerts = status_active["alerts_generated"]
+            await asyncio.sleep(0.3)
+            status_still_paused = service.get_status()
+            assert status_still_paused["events_sent"] == frozen_sent
+            assert status_still_paused["alerts_generated"] == frozen_alerts
+
+            # 2. Resume and verify unpaused flag
+            service.resume()
+            status_resumed = service.get_status()
+            assert status_resumed["is_paused"] is False
+
+            # 3. Test stop cleanly resets session counters and stream pointer
+            await service.stop()
+            status_stopped = service.get_status()
+            assert status_stopped["events_sent"] == 0
+            assert status_stopped["alerts_generated"] == 0
+            assert status_stopped["is_running"] is False
+            assert status_stopped["current_index"] == 0
+
+    asyncio.run(_run())
 

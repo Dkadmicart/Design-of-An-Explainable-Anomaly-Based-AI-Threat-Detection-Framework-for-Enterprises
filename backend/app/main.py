@@ -36,7 +36,9 @@ async def lifespan(app: FastAPI):
     logger.info("Database tables created/verified.")
     async with async_session() as session:
         await seed_default_users(session)
-    logger.info("Enterprise default users seeded/verified.")
+        from app.services.settings_service import get_or_create_settings
+        await get_or_create_settings(session)
+    logger.info("Enterprise default users and platform settings seeded/verified.")
     yield
     logger.info("SentinelAI shutting down...")
 

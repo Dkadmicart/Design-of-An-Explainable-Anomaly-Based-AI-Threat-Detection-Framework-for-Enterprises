@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -9,7 +9,9 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '../services/api';
-import type { DashboardSummary, Alert, AttackDistribution, ModelStatusInfo, TopSource, RiskDistribution } from '../types';
+import { formatTimelineLocalTime } from '../services/replayMetrics';
+import { formatAttackShare } from '../services/dashboardMetrics';
+import type { DashboardSummary, TimelinePoint, Alert, AttackDistribution, ModelStatusInfo, TopSource, RiskDistribution } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { PageContainer, PageHeader } from '../components/common/PageContainer';
 import { Card } from '../components/common/Card';
@@ -81,7 +83,8 @@ function KPICard({ label, value, icon: Icon, description, highlight }: KPICardPr
 // ─── Color Palettes ─────────────────────────────────────────────────────────
 
 const ATTACK_COLORS: Record<string, string> = {
-  BENIGN: '#CBD5E1',
+  BENIGN: '#94A3B8',
+  ATTACK: '#EF4444',
   DDoS: '#EF4444',
   DoS: '#F59E0B',
   PortScan: '#3B82F6',
@@ -117,12 +120,78 @@ export default function DashboardPage() {
   });
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [attacks, setAttacks] = useState<AttackDistribution[]>([]);
+  const [timeline, setTimeline] = useState<TimelinePoint[]>([]);
+  const [timelineTotal, setTimelineTotal] = useState(0);
+  const [isReplayRunning, setIsReplayRunning] = useState(false);
+  const [isReplayPaused, setIsReplayPaused] = useState(false);
+  const [replaySource, setReplaySource] = useState<string | null>(null);
+
+  const loadDashboardData = useCallback(async (isMountedCheck?: () => boolean) => {
+    try {
+      const [sumRes, alertsRes, attacksRes, timelineRes] = await Promise.all([
+        api.getDashboardSummary().catch(() => null),
+        api.getAlerts({ page_size: 6 }).catch(() => null),
+        api.getAttackDistribution().catch(() => null),
+        api.getDashboardTimeline({ window_hours: 24 }).catch(() => null),
+      ]);
+
+      if (isMountedCheck && !isMountedCheck()) return;
+
+      if (sumRes) setSummary(sumRes);
+      if (alertsRes) setAlerts(alertsRes.alerts);
+      if (attacksRes) setAttacks(attacksRes.distribution);
+
+      if (timelineRes) {
+        setIsReplayRunning(Boolean(timelineRes.is_replay_running));
+        setIsReplayPaused(Boolean(timelineRes.is_replay_paused));
+        setReplaySource(timelineRes.source_file);
+        setTimelineTotal(timelineRes.total_events);
+
+        if (timelineRes.timeline && timelineRes.timeline.length > 0) {
+          const localized = timelineRes.timeline.map((pt) => ({
+            ...pt,
+            time: formatTimelineLocalTime(pt.timestamp || pt.time, timelineRes.bucket_seconds || 3600),
+          }));
+          setTimeline(localized);
+        } else {
+          setTimeline([]);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading dashboard data:', err);
+    }
+  }, []);
 
   useEffect(() => {
-    api.getDashboardSummary().then(setSummary).catch(console.error);
-    api.getAlerts({ page_size: 6 }).then(res => setAlerts(res.alerts)).catch(console.error);
-    api.getAttackDistribution().then(res => setAttacks(res.distribution.filter(a => a.type !== 'BENIGN'))).catch(console.error);
-  }, []);
+    let isMounted = true;
+    const checkMounted = () => isMounted;
+
+    loadDashboardData(checkMounted);
+
+    // Real-time synchronization with active dataset replay worker
+    const interval = setInterval(async () => {
+      try {
+        const replayStatus = await api.getReplayStatus();
+        if (!isMounted) return;
+
+        setIsReplayRunning(replayStatus.is_running);
+        setIsReplayPaused(replayStatus.is_paused);
+        if (replayStatus.current_file) setReplaySource(replayStatus.current_file);
+
+        // Auto-refresh timeline telemetry when replay is actively processing flows
+        if (replayStatus.is_running && !replayStatus.is_paused) {
+          loadDashboardData(checkMounted);
+        }
+      } catch {
+        // Backend offline or starting up
+      }
+    }, 3000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [loadDashboardData]);
 
   // Real-time live clock state ticking every second (zero layout shift with tabular-nums)
   const [liveClock, setLiveClock] = useState(() => new Date());
@@ -141,8 +210,6 @@ export default function DashboardPage() {
     day: 'numeric',
     year: 'numeric',
   });
-
-  const timeline: { time: string; normal: number; suspicious: number; critical: number }[] = [];
   const sources: TopSource[] = [];
   const modelStatus: ModelStatusInfo = {
     current_model: 'Random Forest Baseline',
@@ -208,10 +275,11 @@ export default function DashboardPage() {
           description="Network flows analyzed"
         />
         <KPICard
-          label="Detection Rate"
-          value={summary.detection_rate > 0 ? `${summary.detection_rate}%` : 'Not Evaluated'}
+          label="Attack Event Share"
+          value={formatAttackShare(summary).value}
           icon={Eye}
-          description="Awaiting pipeline evaluation"
+          description={formatAttackShare(summary).description}
+          highlight={summary.suspicious_events > 0 ? 'warning' : 'normal'}
         />
       </div>
 
@@ -219,11 +287,37 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8 items-stretch">
         {/* Threat Activity Timeline */}
         <Card p-6 className="xl:col-span-2 h-full flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div>
-              <h3 className="card-title">Threat Activity Timeline</h3>
-              <p className="text-xs text-[var(--color-text-muted)] mt-0.5">24-hour event volume (Normal vs Suspicious vs Critical)</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="card-title">Threat Activity Timeline</h3>
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  Dataset Replay Telemetry
+                </span>
+                {isReplayRunning && !isReplayPaused && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    Replay Processing
+                  </span>
+                )}
+                {isReplayPaused && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    Replay Paused
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                Replay Processing Timeline &middot; 24-hour event volume (Normal vs Suspicious vs Critical)
+                {replaySource ? ` &middot; Source: ${replaySource}` : ''}
+              </p>
             </div>
+            {timeline.length > 0 && (
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono text-[var(--color-text-muted)]">
+                  {timelineTotal.toLocaleString()} replayed flows
+                </span>
+              </div>
+            )}
           </div>
           
           {timeline.length > 0 ? (
@@ -264,8 +358,15 @@ export default function DashboardPage() {
         {/* Attack Vector Distribution Donut */}
         <Card p-6 className="h-full flex flex-col justify-between min-w-0">
           <div>
-            <h3 className="card-title">Attack Vector Distribution</h3>
-            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Categorized attack classifications</p>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="card-title">Traffic Classification Breakdown</h3>
+              <Badge variant="neutral" className="text-[10px]">
+                Binary Model Scope
+              </Badge>
+            </div>
+            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+              Flow classification distribution (BENIGN vs ATTACK)
+            </p>
           </div>
 
           {attacks.length > 0 ? (
@@ -315,8 +416,8 @@ export default function DashboardPage() {
           ) : (
             <EmptyState
               icon={ShieldCheck}
-              title="No Threats Detected"
-              description="Threat classification will appear when telemetry is processed."
+              title="No Traffic Processed"
+              description="Traffic classification will appear when telemetry replay is active."
               action={{ label: 'Open Live Monitor', onClick: () => navigate('/live-monitor'), variant: 'secondary' }}
               variant="emerald"
               minHeight="min-h-[240px]"

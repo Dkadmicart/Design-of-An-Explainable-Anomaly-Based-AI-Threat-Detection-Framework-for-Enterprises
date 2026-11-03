@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ExternalLink, Search, Target, Shield } from 'lucide-react';
+import { ExternalLink, Search, Target, Shield, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '../services/api';
 import type { MitreTechnique } from '../types';
@@ -12,10 +12,20 @@ export default function MitreAttackPage() {
   const [techniques, setTechniques] = useState<MitreTechnique[]>([]);
   const [selectedTechnique, setSelectedTechnique] = useState('');
   const [search, setSearch] = useState('');
+  const [summary, setSummary] = useState<{
+    total_alerts: number;
+    mapped_alerts: number;
+    unmapped_alerts: number;
+    classification_scope: string;
+    evidence_note: string;
+  } | null>(null);
 
   useEffect(() => {
     api.getMitreTechniques().then(res => {
       setTechniques(res.techniques);
+      if (res.summary) {
+        setSummary(res.summary);
+      }
       if (res.techniques.length > 0) {
         setSelectedTechnique(res.techniques[0].id);
       }
@@ -42,6 +52,79 @@ export default function MitreAttackPage() {
           </Badge>
         }
       />
+
+      {/* Distinction Telemetry Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <Card padding="compact" className="flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">
+              Model Inference Scope
+            </span>
+            <p className="text-xl lg:text-2xl font-extrabold text-slate-900 mt-1">
+              BENIGN / ATTACK
+            </p>
+            <span className="text-[10px] text-slate-500 block mt-0.5">
+              Binary Flow Anomaly Detector (XGBoost)
+            </span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 flex-shrink-0">
+            <Shield size={18} strokeWidth={2.2} />
+          </div>
+        </Card>
+
+        <Card padding="compact" className="flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">
+              Confirmed Techniques
+            </span>
+            <p className="text-xl lg:text-2xl font-extrabold text-emerald-600 mt-1">
+              {summary ? summary.mapped_alerts.toLocaleString() : '0'}
+            </p>
+            <span className="text-[10px] text-slate-500 block mt-0.5">
+              Requires Multiclass Ground Truth or Signature
+            </span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 flex-shrink-0">
+            <CheckCircle2 size={18} strokeWidth={2.2} />
+          </div>
+        </Card>
+
+        <Card padding="compact" className="flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">
+              Unmapped Anomaly Alerts
+            </span>
+            <p className="text-xl lg:text-2xl font-extrabold text-amber-600 mt-1">
+              {summary ? summary.unmapped_alerts.toLocaleString() : '0'}
+            </p>
+            <span className="text-[10px] text-slate-500 block mt-0.5">
+              Insufficient Evidence for Technique Attribution
+            </span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 flex-shrink-0">
+            <AlertTriangle size={18} strokeWidth={2.2} />
+          </div>
+        </Card>
+      </div>
+
+      {/* Attribution Integrity Callout */}
+      <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 sm:p-5 mb-6 text-xs text-slate-700 flex items-start gap-3.5 shadow-2xs">
+        <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center shrink-0 mt-0.5">
+          <Info size={16} />
+        </div>
+        <div className="space-y-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-extrabold text-slate-900 text-sm">Enterprise Attribution Integrity Standard</span>
+            <Badge variant="neutral" className="text-[10px] font-mono font-bold">Standard 4.1</Badge>
+          </div>
+          <p className="text-slate-600 leading-relaxed">
+            The SentinelAI XGBoost detector operates strictly as a <strong>binary flow anomaly classifier (BENIGN vs ATTACK)</strong>.
+            Techniques shown below (T1498, T1595, etc.) represent enterprise reference taxonomy mappings to canonical attack categories.
+            In accordance with research integrity standards, <strong>binary predictions and TreeSHAP importance are not converted into speculative technique attributions</strong>.
+            Replay events without multi-class dataset labels or payload signatures remain transparently designated as <strong>Unmapped / Insufficient Evidence</strong>.
+          </p>
+        </div>
+      </div>
 
       {/* Main Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-w-0">
@@ -74,9 +157,17 @@ export default function MitreAttackPage() {
                       : 'border-slate-200/80 hover:bg-slate-50 text-slate-600'
                   )}
                 >
-                  <div className="flex items-start sm:items-center justify-between text-xs gap-2 flex-col sm:flex-row min-w-0">
-                    <span className="font-mono text-blue-600 font-bold shrink-0">{tech.id}</span>
-                    <Badge variant="info" className="text-[10px] font-bold truncate max-w-full">{tech.tactic}</Badge>
+                  <div className="flex items-center justify-between text-xs gap-2 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-blue-600 font-bold shrink-0">{tech.id}</span>
+                      <Badge variant="info" className="text-[10px] font-bold">{tech.tactic}</Badge>
+                    </div>
+                    <Badge
+                      variant={tech.detection_count > 0 ? 'info' : 'neutral'}
+                      className="text-[10px] font-mono font-bold shrink-0"
+                    >
+                      {tech.detection_count > 0 ? `${tech.detection_count} Verified` : '0 Mapped'}
+                    </Badge>
                   </div>
                   <div className="text-xs font-extrabold text-slate-900 break-words whitespace-normal">{tech.name}</div>
                 </button>
@@ -106,6 +197,42 @@ export default function MitreAttackPage() {
                   <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-2">Description</h4>
                   <div className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200/90 font-medium whitespace-pre-wrap break-words min-w-0">
                     {selected.description}
+                  </div>
+                </div>
+
+                {/* Evidence & Telemetry Section */}
+                <div className="min-w-0">
+                  <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-2.5">
+                    Detection Telemetry & Attribution Evidence
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 sm:p-5 rounded-xl bg-slate-50 border border-slate-200/90 text-xs">
+                    <div>
+                      <span className="text-slate-500 block font-medium">Attribution Status</span>
+                      <span className={clsx(
+                        'font-extrabold inline-block mt-0.5',
+                        selected.detection_count > 0 ? 'text-emerald-700' : 'text-slate-700'
+                      )}>
+                        {selected.detection_count > 0 ? `${selected.detection_count} Confirmed Detections` : 'Unmapped / Insufficient Evidence'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block font-medium">Evidence Requirement</span>
+                      <span className="font-semibold text-slate-700 block mt-0.5">
+                        Verified Multiclass Label or DPI Signature
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block font-medium">Model Inference Scope</span>
+                      <span className="font-semibold text-slate-700 block mt-0.5">
+                        Binary Classifier (BENIGN vs ATTACK)
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block font-medium">Taxonomic Basis</span>
+                      <span className="font-semibold text-slate-700 block mt-0.5">
+                        Enterprise ATT&CK Matrix ({selected.id})
+                      </span>
+                    </div>
                   </div>
                 </div>
 
